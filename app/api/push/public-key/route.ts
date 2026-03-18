@@ -1,6 +1,4 @@
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = 'force-dynamic';
 
 // GET /api/push/public-key
 // Return the VAPID public key for client-side subscription

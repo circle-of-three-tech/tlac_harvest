@@ -1,6 +1,4 @@
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = 'force-dynamic';
 
 // app/api/admin/sms-templates/route.ts
 import { NextRequest, NextResponse } from "next/server";

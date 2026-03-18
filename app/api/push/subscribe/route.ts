@@ -1,6 +1,4 @@
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = 'force-dynamic';
 
 // POST /api/push/subscribe
 // Store a new push subscription for the current user

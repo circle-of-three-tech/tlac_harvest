@@ -1,6 +1,4 @@
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = 'force-dynamic';
 
 // POST /api/push/unsubscribe
 // Remove a push subscription for the current user

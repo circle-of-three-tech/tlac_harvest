@@ -172,7 +172,3 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   await prisma.lead.delete({ where: { id: params.id } });
   return NextResponse.json({ success: true });
 }
-
-export async function generateStaticParams() {
-  return [];
-}

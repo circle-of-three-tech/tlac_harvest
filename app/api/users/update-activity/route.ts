@@ -1,6 +1,4 @@
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = 'force-dynamic';
 
 // POST /api/users/update-activity
 // Update the current user's lastActivity timestamp

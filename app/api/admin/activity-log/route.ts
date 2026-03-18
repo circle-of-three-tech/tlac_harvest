@@ -1,6 +1,4 @@
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = 'force-dynamic';
 
 // app/api/admin/activity-log/route.ts
 import { NextRequest, NextResponse } from "next/server";
