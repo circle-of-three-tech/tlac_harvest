@@ -106,7 +106,7 @@ export default function SignupPage() {
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
                   placeholder="John Doe"
-                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-earth-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
+                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
               </div>
             </div>
@@ -125,7 +125,7 @@ export default function SignupPage() {
                     setForm((f) => ({ ...f, email: e.target.value }))
                   }
                   placeholder="you@example.com"
-                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-earth-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
+                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function SignupPage() {
                     setForm((f) => ({ ...f, phone: e.target.value }))
                   }
                   placeholder="+234 XXX XXX XXXX"
-                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-earth-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
+                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function SignupPage() {
                     setForm((f) => ({ ...f, noOfSoulsTarget: e.target.value }))
                   }
                   placeholder="e.g., 100"
-                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-earth-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
+                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
               </div>
             </div>  
@@ -180,7 +180,7 @@ export default function SignupPage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, gender: e.target.value }))
                   }
-                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-earth-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
+                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 >
                   <option value="" className="text-earth-400">
                     Gender
@@ -211,7 +211,7 @@ export default function SignupPage() {
                     setForm((f) => ({ ...f, password: e.target.value }))
                   }
                   placeholder="Min. 6 characters"
-                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-earth-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
+                  className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
               </div>
             </div>

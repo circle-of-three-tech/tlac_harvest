@@ -1,7 +1,9 @@
-const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs');
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, '..');
 const publicDir = path.join(rootDir, 'public');
 const sourceImage = path.join(publicDir, 'applogo.jpg');

@@ -80,7 +80,7 @@ const PasswordResetForm = () =>{
     }
   };
    return (
-    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-harvest-950 via-earth-900 to-harvest-900 p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-white p-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-0 left-0 w-full h-full opacity-5"
