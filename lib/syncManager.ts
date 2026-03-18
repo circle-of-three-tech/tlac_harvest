@@ -7,7 +7,7 @@ import {
   getPendingLeads,
   updateLeadSyncStatus,
   deleteOfflineLead,
-  OfflineLead,
+  // OfflineLead,
 } from './offlineLeads';
 
 export interface SyncStatus {
