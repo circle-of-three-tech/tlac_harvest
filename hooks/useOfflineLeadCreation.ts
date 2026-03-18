@@ -18,6 +18,7 @@ export function useOfflineLeadCreation(options: UseOfflineLeadCreationOptions = 
 
   /**
    * Create a lead (either online via API or offline via storage)
+   * Uses online-first with automatic fallback to offline on failure
    */
   const createLead = async (leadData: {
     fullName: string;
@@ -30,42 +31,48 @@ export function useOfflineLeadCreation(options: UseOfflineLeadCreationOptions = 
     gender?: string;
   }): Promise<string> => {
     try {
+      // Always try online first if we have connectivity
       if (isOnline) {
-        // Online: use API
-        const response = await fetch('/api/leads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(leadData),
-        });
+        try {
+          const response = await fetch('/api/leads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(leadData),
+          });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to create lead');
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create lead');
+          }
+
+          const data = await response.json();
+          options.onSuccess?.(data.id);
+          return data.id;
+        } catch (apiError) {
+          // If online request fails, fall back to offline storage
+          console.log('Online lead creation failed, falling back to offline storage:', apiError);
+          // Continue to offline creation below
         }
-
-        const data = await response.json();
-        options.onSuccess?.(data.id);
-        return data.id;
-      } else {
-        // Offline: save to local storage
-        const offlineLead: OfflineLead = {
-          id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          fullName: leadData.fullName,
-          ageRange: leadData.ageRange,
-          phone: leadData.phone,
-          address: leadData.address || '',
-          location: leadData.location || '',
-          additionalNotes: leadData.additionalNotes || '',
-          soulState: leadData.soulState || '',
-          gender: leadData.gender || '',
-          createdAt: new Date().toISOString(),
-          syncStatus: 'pending',
-        };
-
-        await saveOfflineLead(offlineLead);
-        options.onSuccess?.(offlineLead.id);
-        return offlineLead.id;
       }
+
+      // Offline or fallback: save to local storage
+      const offlineLead: OfflineLead = {
+        id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        fullName: leadData.fullName,
+        ageRange: leadData.ageRange,
+        phone: leadData.phone,
+        address: leadData.address || '',
+        location: leadData.location || '',
+        additionalNotes: leadData.additionalNotes || '',
+        soulState: leadData.soulState || '',
+        gender: leadData.gender || '',
+        createdAt: new Date().toISOString(),
+        syncStatus: 'pending',
+      };
+
+      await saveOfflineLead(offlineLead);
+      options.onSuccess?.(offlineLead.id);
+      return offlineLead.id;
     } catch (error) {
       const err = error instanceof Error ? error : new Error('Unknown error');
       options.onError?.(err);
