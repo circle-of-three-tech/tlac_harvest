@@ -21,31 +21,44 @@ export interface SyncStatus {
 export type SyncStatusCallback = (status: SyncStatus) => void;
 
 let syncStatusCallbacks: SyncStatusCallback[] = [];
-let currentSyncStatus: SyncStatus = {
-  isOnline: navigator.onLine,
+
+// FIX 1: Don't initialize isOnline at module level — it may run on the server
+// where navigator is undefined or unreliable. Start as true and let the first
+// health check correct it. 
+const currentSyncStatus: SyncStatus = {
+  isOnline: true,
   isSyncing: false,
   pendingCount: 0,
 };
 let healthCheckInterval: NodeJS.Timeout | null = null;
 
 /**
- * Check actual network connectivity by making a lightweight request
+ * Check actual network connectivity by making a lightweight request.
+ *
+ * FIX 2: Accept ANY HTTP response as "online". Only a thrown network error
+ * (no response at all) means the device is truly offline.
  */
 async function verifyNetworkConnectivity(): Promise<boolean> {
-  try {
-    // Use a lightweight endpoint or a no-op request to verify connectivity
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+  // Guard: can't run fetch on the server during SSR
+  if (typeof window === 'undefined') return true;
 
-    const response = await fetch('/api/health', {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    // FIX 3: Use cache: 'no-store' so a cached response doesn't mask real
+    // offline state.
+    await fetch('/api/health', {
       method: 'HEAD',
       signal: controller.signal,
+      cache: 'no-store',
     });
 
     clearTimeout(timeoutId);
-    return response.ok || response.status === 404; // 404 is fine, we just need to know we can reach the server
-  } catch (error) {
-    // Network error - truly offline
+    // Any response (even 4xx/5xx) proves the network stack is working.
+    return true;
+  } catch {
+    // AbortError = timeout, TypeError = no network — both mean offline.
     return false;
   }
 }
@@ -57,7 +70,11 @@ async function performHealthCheck(): Promise<void> {
   try {
     const isActuallyOnline = await verifyNetworkConnectivity();
 
-    // Only update if status has changed
+    // FIX 4: Always refresh pendingCount on each health check so the badge
+    // stays accurate even without a status change.
+    const pending = await getPendingLeads();
+    currentSyncStatus.pendingCount = pending.length;
+
     if (isActuallyOnline !== currentSyncStatus.isOnline) {
       currentSyncStatus.isOnline = isActuallyOnline;
       notifyStatusChange();
@@ -66,8 +83,11 @@ async function performHealthCheck(): Promise<void> {
         console.log('Network restored - starting sync');
         await syncOfflineLeads();
       } else {
-        console.log('Network disconnected detected');
+        console.log('Network disconnection detected');
       }
+    } else {
+      // Still notify so pendingCount update reaches subscribers
+      notifyStatusChange();
     }
   } catch (error) {
     console.error('Error performing health check:', error);
@@ -78,24 +98,27 @@ async function performHealthCheck(): Promise<void> {
  * Initialize sync manager and network monitoring
  */
 export async function initializeSyncManager(): Promise<void> {
+  // Guard: window events are client-only
+  if (typeof window === 'undefined') return;
+
   try {
-    // Update initial pending count
     const pending = await getPendingLeads();
     currentSyncStatus.pendingCount = pending.length;
-    notifyStatusChange();
 
-    // Listen for online/offline events
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Start periodic health check every 10 seconds
-    // This catches cases where navigator.onLine gets stuck
+    // Perform immediate health check to get accurate initial status
+    const isActuallyOnline = await verifyNetworkConnectivity();
+    currentSyncStatus.isOnline = isActuallyOnline;
+    notifyStatusChange();
+
+    // Periodic check every 10 seconds as fallback for stuck navigator.onLine
     healthCheckInterval = setInterval(() => {
       performHealthCheck();
     }, 10000);
 
-    // Initial sync if online
-    if (navigator.onLine) {
+    if (isActuallyOnline) {
       await syncOfflineLeads();
     }
   } catch (error) {
@@ -107,6 +130,8 @@ export async function initializeSyncManager(): Promise<void> {
  * Cleanup sync manager
  */
 export function cleanupSyncManager(): void {
+  if (typeof window === 'undefined') return;
+
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
   if (healthCheckInterval) {
@@ -120,8 +145,6 @@ export function cleanupSyncManager(): void {
  */
 export function onSyncStatusChange(callback: SyncStatusCallback): () => void {
   syncStatusCallbacks.push(callback);
-
-  // Return unsubscribe function
   return () => {
     syncStatusCallbacks = syncStatusCallbacks.filter((cb) => cb !== callback);
   };
@@ -135,12 +158,18 @@ export function getSyncStatus(): SyncStatus {
 }
 
 /**
- * Handle online event
+ * Handle online event.
+ *
+ * FIX 5: Don't trust the browser 'online' event blindly — it fires on captive
+ * portals too. Verify with a real request before marking as online.
  */
-function handleOnline(): void {
-  currentSyncStatus.isOnline = true;
+async function handleOnline(): Promise<void> {
+  const isActuallyOnline = await verifyNetworkConnectivity();
+  currentSyncStatus.isOnline = isActuallyOnline;
   notifyStatusChange();
-  syncOfflineLeads();
+  if (isActuallyOnline) {
+    await syncOfflineLeads();
+  }
 }
 
 /**
@@ -194,7 +223,6 @@ export async function syncOfflineLeads(): Promise<void> {
         await updateLeadSyncStatus(lead.id, 'syncing');
         notifyStatusChange();
 
-        // Send to server
         const response = await fetch('/api/leads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -215,7 +243,8 @@ export async function syncOfflineLeads(): Promise<void> {
           successCount++;
           console.log(`✓ Synced lead: ${lead.fullName}`);
         } else {
-          const errorData = await response.json();
+          // FIX 6: Guard against response.json() throwing on non-JSON error bodies
+          const errorData = await response.json().catch(() => ({}));
           const errorMsg = errorData.error || `HTTP ${response.status}`;
           await updateLeadSyncStatus(lead.id, 'failed', errorMsg);
           failureCount++;
@@ -231,15 +260,16 @@ export async function syncOfflineLeads(): Promise<void> {
       notifyStatusChange();
     }
 
-    // Update pending count
     const remaining = await getPendingLeads();
     currentSyncStatus.pendingCount = remaining.length;
     currentSyncStatus.lastSyncTime = new Date();
-    currentSyncStatus.error = failureCount > 0 ? `${failureCount} lead(s) failed to sync` : undefined;
+    currentSyncStatus.error =
+      failureCount > 0 ? `${failureCount} lead(s) failed to sync` : undefined;
 
     console.log(`Sync complete: ${successCount} succeeded, ${failureCount} failed`);
   } catch (error) {
-    currentSyncStatus.error = error instanceof Error ? error.message : 'Unknown error';
+    currentSyncStatus.error =
+      error instanceof Error ? error.message : 'Unknown error';
     console.error('Error during sync:', error);
   } finally {
     currentSyncStatus.isSyncing = false;
@@ -254,27 +284,26 @@ export async function triggerManualSync(): Promise<void> {
   if (!currentSyncStatus.isOnline) {
     throw new Error('Device is offline. Cannot sync.');
   }
-
   if (currentSyncStatus.isSyncing) {
     throw new Error('Sync is already in progress.');
   }
-
   await syncOfflineLeads();
 }
+
 /**
  * Force check network connectivity (useful for manual refresh)
  */
 export async function forceCheckNetwork(): Promise<boolean> {
   const isOnline = await verifyNetworkConnectivity();
-  
+
   if (isOnline !== currentSyncStatus.isOnline) {
     currentSyncStatus.isOnline = isOnline;
     notifyStatusChange();
-    
+
     if (isOnline) {
       await syncOfflineLeads();
     }
   }
-  
+
   return isOnline;
 }

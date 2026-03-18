@@ -30,8 +30,12 @@ interface SyncContextType {
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
+  // FIX: Start with a safe server-side default (isOnline: true, not
+  // navigator.onLine which can be stale or undefined during SSR).
+  // The real status will be pushed via onSyncStatusChange as soon as
+  // initializeSyncManager completes its first health check.
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    isOnline: true,
     isSyncing: false,
     pendingCount: 0,
   });
@@ -39,14 +43,20 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [manualSyncError, setManualSyncError] = useState<string>();
 
   useEffect(() => {
-    // Initialize sync manager
-    initializeSyncManager().then(() => {
-      setIsReady(true);
-    });
-
-    // Subscribe to status changes
+    // FIX: Subscribe FIRST so we never miss a notification fired during init.
+    // Previously, initializeSyncManager() was awaited before subscribing,
+    // meaning the corrected isOnline status from the first health check was
+    // broadcast before any listener existed — so the UI never updated.
     const unsubscribe = onSyncStatusChange((status) => {
       setSyncStatus(status);
+    });
+
+    // Now initialize. Any notifyStatusChange() calls inside will reach us.
+    initializeSyncManager().then(() => {
+      // After init, pull the latest status in case we somehow missed a
+      // notification (e.g. a synchronous status set during init).
+      setSyncStatus(getSyncStatus());
+      setIsReady(true);
     });
 
     return () => {

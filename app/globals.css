@@ -81,7 +81,7 @@ body {
   @apply w-full text-sm;
 }
 .harvest-table thead {
-  @apply bg-harvest-200;
+  @apply bg-harvest-100;
 }
 .harvest-table th {
   @apply text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600;

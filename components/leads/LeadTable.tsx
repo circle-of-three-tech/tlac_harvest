@@ -5,12 +5,26 @@ import { LEAD_STATUS_LABELS, SOUL_STATE_LABELS, AGE_RANGE_LABELS, getAttendanceS
 import { format } from "date-fns";
 import LeadDetailModal from "./LeadDetailModal"; 
 
+export interface Lead {
+  id: string;
+  fullName: string;
+  location: string;
+  soulState: string;
+  status: string;
+  ageRange: string;
+  monthsConsistent?: number;
+  churchMembership?: boolean;
+  assignedTo?: { id: string; name: string } | null;
+  addedBy?: { id: string; name: string } | null;
+  createdAt: string;
+}
+
 interface Props {
-  leads: any[];
+  leads: Lead[];
   showAssignedTo?: boolean;
   showAddedBy?: boolean;
   isAdmin?: boolean;
-  onLeadUpdated?: (lead: any) => void;
+  onLeadUpdated?: (lead: Lead) => void;
   onLeadDeleted?: (id: string) => void;
   pageSize?: number;
 }
@@ -27,8 +41,20 @@ const SOUL_CLASSES: Record<string, string> = {
   HUNGRY_BELIEVER: "badge badge-hungry",
 };
 
+// Safe date formatter that handles invalid dates
+const formatDate = (dateValue: string): string => {
+  if (!dateValue) return "—";
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return "—";
+    return format(date, "MMMM d, yyyy");
+  } catch {
+    return "—";
+  }
+};
+
 export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = false, isAdmin = false, onLeadUpdated, onLeadDeleted, pageSize = 10 }: Props) {
-  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Calculate pagination
@@ -98,14 +124,14 @@ export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = 
                     <td className="text-slate-600">{lead.assignedTo?.name ?? <span className="text-slate-300 italic text-xs">Unassigned</span>}</td>
                   )}
                   <td>
-                    {(lead.monthsConsistent > 0 || lead.churchMembership) ? (
+                    {(lead?.monthsConsistent &&lead?.monthsConsistent > 0 || lead?.churchMembership) ? (
                       <span className={cn("badge text-xs", att.bg, att.color)}>{att.label}</span>
                     ) : (
                       <span className="text-slate-300 text-xs italic">—</span>
                     )}
                   </td>
                   <td className="text-slate-400 text-xs">
-                    {format(new Date(lead.createdAt), "MMM d, yyyy")}
+                    {formatDate(lead.createdAt)}
                   </td>
                   <td>
                     <button
@@ -171,7 +197,7 @@ export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = 
                 )}
                 <div className="flex justify-between">
                   <span className="text-slate-500">Attendance</span>
-                  {(lead.monthsConsistent > 0 || lead.churchMembership) ? (
+                  {(lead?.monthsConsistent && lead?.monthsConsistent > 0 || lead.churchMembership) ? (
                     <span className={cn("badge text-xs", att.bg, att.color)}>{att.label}</span>
                   ) : (
                     <span className="text-slate-300 text-xs italic">—</span>
@@ -179,7 +205,7 @@ export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = 
                 </div>
                 <div className="flex justify-between pt-2 border-t border-harvest-100">
                   <span className="text-slate-500">Date</span>
-                  <span className="text-slate-400 text-xs">{format(new Date(lead.createdAt), "MMM d, yyyy")}</span>
+                  <span className="text-slate-400 text-xs">{formatDate(lead.createdAt)}</span>
                 </div>
               </div>
             </div>
