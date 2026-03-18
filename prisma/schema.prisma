@@ -1,0 +1,223 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") 
+}
+
+enum Role {
+  EVANGELIST
+  FOLLOWUP
+  ADMIN
+}
+
+enum SoulState {
+  NEW_CONVERT
+  UNCHURCHED_BELIEVER
+  HUNGRY_BELIEVER
+}
+
+enum LeadStatus {
+  NEW_LEAD
+  FOLLOWING_UP
+  CONVERTED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum AgeRange {
+  UNDER_18
+  AGE_18_25
+  AGE_26_35
+  AGE_36_45
+  AGE_46_60
+  ABOVE_60
+}
+
+enum ChurchMembership {
+  TLAC
+  KSOD
+  BOTH_TLAC_AND_KSOD
+  OTHERS
+}
+
+enum SMSType {
+  NEW_LEAD_NOTIFICATION
+  ADMIN_ALERT
+  FOLLOWUP_ASSIGNMENT
+}
+
+enum SMSStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum TargetRole {
+  FOLLOWUP
+  EVANGELIST
+  ALL
+}
+
+enum AuditLogType {
+  NOTE
+  FIELD_CHANGE
+  SMS_SENT
+  STATUS_CHANGE
+  ASSIGNMENT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          Role      @default(EVANGELIST)
+  phone         String?
+  gender        Gender?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastActivity  DateTime  @default(now())  // Track when user was last active for inactivity reminders
+
+  noOfSoulsTarget        Int?      @default(0)
+  addedLeads    Lead[]    @relation("AddedBy")
+  assignedLeads Lead[]    @relation("AssignedTo")
+  notes         Note[]
+  smsTemplates  SMSTemplate[]
+  announcements Announcement[]
+  adminPhones   AdminPhone[]
+  auditLogs     AuditLog[]
+  pushSubscriptions PushSubscription[]
+}
+
+model Lead {
+  id              String            @id @default(cuid())
+  fullName        String
+  ageRange        AgeRange
+  phone           String?
+  address         String?
+  location        String
+  additionalNotes String?
+  gender          Gender              @default(MALE)
+  soulState       SoulState
+  status          LeadStatus        @default(NEW_LEAD)
+
+  // Church follow-up fields
+  churchMembership  ChurchMembership?
+  churchName        String?           // required if OTHERS
+  monthsConsistent  Int               @default(0)
+
+  addedById       String
+  addedBy         User              @relation("AddedBy", fields: [addedById], references: [id])
+
+  assignedToId    String?
+  assignedTo      User?             @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  notes           Note[]
+  smsLogs         SMSLog[]
+  auditLogs       AuditLog[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  content   String
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model SMSTemplate {
+  id        String    @id @default(cuid())
+  type      SMSType   @unique
+  title     String
+  content   String    // Template with placeholders like {leadName}, {phoneNumber}
+  createdById String
+  createdBy User      @relation(fields: [createdById], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model SMSLog {
+  id            String    @id @default(cuid())
+  type          SMSType
+  recipientPhone String
+  content       String
+  status        SMSStatus @default(PENDING)
+  errorMessage  String?
+  leadId        String?
+  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  sentAt        DateTime?
+}
+
+model Announcement {
+  id          String      @id @default(cuid())
+  title       String
+  content     String
+  targetRole  TargetRole
+  expiryDate  DateTime
+  hidden      Boolean     @default(false)
+  createdById String
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model AdminPhone {
+  id        String   @id @default(cuid())
+  phone     String
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([adminId, phone])
+}
+
+model AuditLog {
+  id          String        @id @default(cuid())
+  type        AuditLogType
+  leadId      String
+  lead        Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  fieldName   String?       // Name of field that changed (only for FIELD_CHANGE type)
+  oldValue    String?       // Previous value (only for FIELD_CHANGE type)
+  newValue    String?       // New value (only for FIELD_CHANGE type)
+  noteContent String?       // Content of note (only for NOTE type)
+  details     Json?         // Flexible JSON for additional metadata
+  createdAt   DateTime      @default(now())
+} 
+
+model PushSubscription {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String    // Push service endpoint URL
+  auth      String    // Authentication secret
+  p256dh    String    // Encryption key
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, endpoint])  // One subscription per device/browser per user
+}

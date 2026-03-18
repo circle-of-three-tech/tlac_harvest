@@ -1,0 +1,153 @@
+/* @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono&display=swap'); */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Ruthie&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --harvest-primary: #fec449;
+  --harvest-dark: #2f1a0f;
+  --harvest-light: #f5f5f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--harvest-light);
+  color: var(--harvest-dark);
+}
+
+.font-display {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #fff8ed; }
+::-webkit-scrollbar-thumb { background: #fec449; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #fec449; }
+
+/* Custom classes */
+.harvest-card {
+  @apply rounded-2xl shadow-sm w-full;
+}
+
+.harvest-btn {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200;
+}
+
+.harvest-btn-primary {
+  @apply harvest-btn bg-harvest-500 text-white hover:bg-harvest-600 active:bg-harvest-700 shadow-sm;
+}
+
+.harvest-btn-secondary {
+  @apply harvest-btn bg-harvest-50 text-harvest-700 border border-harvest-200 hover:bg-harvest-100;
+}
+
+.harvest-btn-danger {
+  @apply harvest-btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100;
+}
+
+.harvest-input {
+  @apply w-full min-w-[50%] rounded-xl border border-slate-200 bg-white hover:bg-white px-4 py-2.5 text-sm text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-harvest-400 focus:border-transparent transition-all;
+}
+
+.harvest-label {
+  @apply block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5;
+}
+
+.harvest-select {
+  @apply harvest-input appearance-none cursor-pointer;
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+}
+
+.badge-new { @apply bg-orange-100 text-orange-700; }
+.badge-following { @apply bg-blue-100 text-blue-700; }
+.badge-converted { @apply bg-green-100 text-green-700; }
+
+.badge-new-convert { @apply bg-red-100 text-red-700; }
+.badge-unchurched { @apply bg-amber-100 text-amber-700; }
+.badge-hungry { @apply bg-emerald-100 text-emerald-700; }
+
+/* Table */
+.harvest-table {
+  @apply w-full text-sm;
+}
+.harvest-table thead {
+  @apply bg-harvest-200;
+}
+.harvest-table th {
+  @apply text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600;
+}
+.harvest-table td {
+  @apply px-4 py-3 border-t border-harvest-50 text-slate-800;
+}
+.harvest-table tr:hover td {
+  @apply bg-harvest-50/40;
+}
+
+/* Sidebar */
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+}
+.sidebar-link-active {
+  @apply bg-earth-500 text-white shadow-sm;
+}
+.sidebar-link-inactive {
+  @apply text-slate-700 hover:bg-earth-50 hover:text-earth-700;
+}
+
+/* Mobile sidebar responsive */
+@media (max-width: 640px) {
+  .sidebar-link {
+    @apply md:justify-center justify-start px-3;
+  }
+}
+
+/* Page header */
+.page-header {
+  @apply mb-6 sm:mb-8;
+}
+.page-title {
+  @apply font-display text-xl sm:text-2xl font-bold text-slate-900;
+}
+.page-subtitle {
+  @apply text-xs sm:text-sm  text-slate-500 mt-1;
+}
+
+/* Responsive table */
+@media (max-width: 640px) {
+  .harvest-table th {
+    @apply px-2 py-2 text-xs;
+  }
+  .harvest-table td {
+    @apply px-2 py-2 text-xs;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Grain texture overlay */
+.grain-overlay::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 9999;
+}
