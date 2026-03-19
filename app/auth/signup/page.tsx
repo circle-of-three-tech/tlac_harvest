@@ -28,6 +28,7 @@ export default function SignupPage() {
     noOfSoulsTarget: "",
     role: "EVANGELIST",
   });
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -157,7 +158,7 @@ export default function SignupPage() {
                 <Target className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-earth-500" />
                 <input
                   type="number"
-                  required
+                  required={ form.role === "EVANGELIST" ? true : false }
                   value={form.noOfSoulsTarget}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, noOfSoulsTarget: e.target.value }))
@@ -200,10 +201,10 @@ export default function SignupPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                 Password
               </label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-earth-500" />
                 <input
-                  type="password"
+                  type={isPasswordVisible ? "text" : "password"}
                   required
                   minLength={6}
                   value={form.password}
@@ -213,6 +214,13 @@ export default function SignupPage() {
                   placeholder="Min. 6 characters"
                   className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordVisible((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-500 text-xs"
+                >
+                  {isPasswordVisible ? "Hide" : "Show"}
+                </button>
               </div>
             </div>
             <div>
