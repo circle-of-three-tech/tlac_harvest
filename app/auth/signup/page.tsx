@@ -150,6 +150,7 @@ export default function SignupPage() {
               </div>
             </div>
 
+          {form.role === "EVANGELIST" && (
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                 No. of Souls Target
@@ -168,6 +169,7 @@ export default function SignupPage() {
                 />
               </div>
             </div>  
+          )}
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
