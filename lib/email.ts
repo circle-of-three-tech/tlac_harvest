@@ -16,10 +16,10 @@ const transportOptions: SMTPTransport.Options = {
 const transporter = nodemailer.createTransport(transportOptions);
 export async function sendPasswordResetEmail(to: string, name: string, resetUrl: string) {
   const mailOptions = {
-    from: `"The Harvest" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
+    from: `"TLAC Harvest" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
     to,
-    subject: "Reset Your Password – The Harvest",
-    text: `Hi ${name},\n\nYou requested a password reset. Click the link below to set a new password. This link expires in 1 hour.\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.\n\n— The Harvest Team`,
+    subject: "Reset Your Password – TLAC Harvest",
+    text: `Hi ${name},\n\nYou requested a password reset. Click the link below to set a new password. This link expires in 1 hour.\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.\n\n— TLAC Harvest Team`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -79,7 +79,7 @@ export async function sendPasswordResetEmail(to: string, name: string, resetUrl:
           <!-- Footer -->
           <tr>
             <td style="background:#fff8ed;padding:20px 40px;text-align:center;border-top:1px solid #ffefd4;">
-              <p style="margin:0;font-size:12px;color:#c4a882;">© ${new Date().getFullYear()} The Harvest. All rights reserved.</p>
+              <p style="margin:0;font-size:12px;color:#c4a882;">© ${new Date().getFullYear()} TLAC Harvest. All rights reserved.</p>
             </td>
           </tr>
 

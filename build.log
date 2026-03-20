@@ -1,0 +1,52 @@
+
+> tlac_harvest@0.1.0 build
+> prisma generate && node scripts/generate-pwa-assets.js && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 480ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+
+Generating PWA assets from applogo.jpg...
+
+✓ Generated icon-96x96.png
+✓ Generated icon-96x96-maskable.png
+✓ Generated icon-192x192.png
+✓ Generated icon-192x192-maskable.png
+✓ Generated icon-512x512.png
+✓ Generated icon-512x512-maskable.png
+✓ Generated splash-192x192.png
+✓ Generated splash-512x512.png
+
+✅ All PWA assets generated successfully!
+  ▲ Next.js 14.2.29
+  - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+> [PWA] Compile server
+> [PWA] Compile server
+> [PWA] Compile client (static)
+> [PWA] Auto register service worker with: /home/victor-olorunda/Documents/WORKSPACE/tlac/tlac_harvest/node_modules/next-pwa/register.js
+> [PWA] Service worker: /home/victor-olorunda/Documents/WORKSPACE/tlac/tlac_harvest/public/sw.js
+> [PWA]   url: /sw.js
+> [PWA]   scope: /
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+./app/dashboard/evangelist/leads/page.tsx:88:13
+Type error: Type '{ _id: string; }[]' is not assignable to type 'Lead[]'.
+  Type '{ _id: string; }' is missing the following properties from type 'Lead': id, fullName, location, soulState, and 3 more.
+
+[0m [90m 86 |[39m         ) [33m:[39m ([0m
+[0m [90m 87 |[39m           [33m<[39m[33mLeadTable[39m[0m
+[0m[31m[1m>[22m[39m[90m 88 |[39m             leads[33m=[39m{paginatedLeads}[0m
+[0m [90m    |[39m             [31m[1m^[22m[39m[0m
+[0m [90m 89 |[39m             onLeadUpdated[33m=[39m{(updated) [33m=>[39m {[0m
+[0m [90m 90 |[39m               [90m// Leads will be refetched on sync[39m[0m
+[0m [90m 91 |[39m             }}[0m
+Next.js build worker exited with code: 1 and signal: null

@@ -63,6 +63,7 @@ export function useOfflineOperation() {
           resourceId,
           resourceType,
           payload,
+          timestamp: Date.now(),
           clientTimestamp: Date.now(),
           status: 'pending',
           retryCount: 0,

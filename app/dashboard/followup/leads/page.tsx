@@ -5,6 +5,7 @@ import { Search, AlertCircle } from "lucide-react";
 import LeadTable from "@/components/leads/LeadTable";
 import { useLeadsData, usePaginatedOfflineData } from "@/hooks/useOfflineData";
 import { useSync } from "@/components/SyncProvider";
+import { transformCachedLeadToLead } from "@/lib/offlineLeads";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -22,9 +23,15 @@ export default function FollowupLeadsPage() {
   }, [allLeads, search]);
 
   const { data: paginatedLeads, totalPages } = usePaginatedOfflineData(
-    filteredLeads,
+    filteredLeads as any[],
     ITEMS_PER_PAGE,
     page
+  );
+
+  // Transform cached leads to Lead interface
+  const transformedLeads = useMemo(
+    () => (paginatedLeads as any[]).map(transformCachedLeadToLead),
+    [paginatedLeads]
   );
 
   return (
@@ -72,7 +79,7 @@ export default function FollowupLeadsPage() {
           </div>
         ) : (
           <LeadTable
-            leads={paginatedLeads}
+            leads={transformedLeads}
             showAssignedTo={false}
             showAddedBy={true}
             onLeadUpdated={(updated) => {

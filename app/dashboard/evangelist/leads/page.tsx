@@ -6,6 +6,7 @@ import LeadTable from "@/components/leads/LeadTable";
 import AddLeadModal from "@/components/leads/AddLeadModal";
 import { useLeadsData, usePaginatedOfflineData } from "@/hooks/useOfflineData";
 import { useSync } from "@/components/SyncProvider";
+import { transformCachedLeadToLead } from "@/lib/offlineLeads";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -27,9 +28,15 @@ export default function EvangelistLeadsPage() {
 
   // Paginate
   const { data: paginatedLeads, totalPages } = usePaginatedOfflineData(
-    filteredLeads,
+    filteredLeads as any[],
     ITEMS_PER_PAGE,
     page
+  );
+
+  // Transform cached leads to Lead interface
+  const transformedLeads = useMemo(
+    () => (paginatedLeads as any[]).map(transformCachedLeadToLead),
+    [paginatedLeads]
   );
 
   return (
@@ -85,7 +92,7 @@ export default function EvangelistLeadsPage() {
           </div>
         ) : (
           <LeadTable
-            leads={paginatedLeads}
+            leads={transformedLeads}
             onLeadUpdated={(updated) => {
               // Leads will be refetched on sync
             }}

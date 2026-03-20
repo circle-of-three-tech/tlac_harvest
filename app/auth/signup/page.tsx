@@ -15,6 +15,8 @@ import {
   Users,
   Target,
   Wheat,
+  EyeOff,
+  Eye
 } from "lucide-react";
 
 export default function SignupPage() {
@@ -221,7 +223,7 @@ export default function SignupPage() {
                   onClick={() => setIsPasswordVisible((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-500 text-xs"
                 >
-                  {isPasswordVisible ? "Hide" : "Show"}
+                  {isPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>

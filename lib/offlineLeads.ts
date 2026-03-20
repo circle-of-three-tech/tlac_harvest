@@ -783,3 +783,26 @@ export async function clearAllCachedData(): Promise<void> {
     throw error;
   }
 }
+
+// ==================== TRANSFORMATION HELPERS ====================
+
+/**
+ * Transform cached lead to component Lead interface
+ */
+export function transformCachedLeadToLead(cachedLead: CachedLead): any {
+  return {
+    id: cachedLead._id,
+    fullName: cachedLead.fullName,
+    location: cachedLead.location,
+    soulState: cachedLead.soulState || 'UNBELIEVER',
+    status: cachedLead.status || 'NEW_LEAD',
+    ageRange: cachedLead.ageRange,
+    phone: cachedLead.phone,
+    address: cachedLead.address,
+    additionalNotes: cachedLead.additionalNotes,
+    gender: cachedLead.gender,
+    createdByName: cachedLead.createdByName,
+    assignedTo: cachedLead.assignedTo,
+    createdAt: new Date().toISOString(), // Use cached timestamp
+  };
+}
