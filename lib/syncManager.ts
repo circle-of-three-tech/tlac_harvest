@@ -673,7 +673,7 @@ export async function loadCachedAnnouncements(): Promise<void> {
       (ann: any) => ({
         _id: ann?.id ?? ann?._id,
         title: ann.title,
-        message: ann.message,
+        message: ann.content,
         priority: ann.priority,
         createdAt: ann.createdAt,
       })
