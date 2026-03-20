@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ServiceWorkerUpdater } from "./ServiceWorkerUpdater";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -13,7 +14,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "The Harvest",
+  title: "TLAC Harvest",
   description: "Lead tracking for the harvest",
   manifest: "/manifest.json",
   icons: {
@@ -23,16 +24,16 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black",
-    title: "The Harvest",
+    title: "TLAC Harvest",
   },
   formatDetection: {
     telephone: false,
   },
   openGraph: {
-    title: "The Harvest",
+    title: "TLAC Harvest",
     description: "Lead tracking and management for church outreach",
     type: "website",
-    url: "https://harvest.example.com",
+    url: "https://tlacharvest.com.ng",
   },
 };
 
@@ -61,6 +62,7 @@ export default function RootLayout({
       <body className="grain-overlay antialiased">
         <Providers>{children}</Providers>
       </body>
+      <ServiceWorkerUpdater />
     </html>
   );
 }
