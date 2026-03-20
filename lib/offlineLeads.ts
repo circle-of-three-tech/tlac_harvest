@@ -588,18 +588,10 @@ export async function cacheActivityLogs(logs: CachedActivityLog[]): Promise<void
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const logsWithTimestamp = logs.map((log: any) => {
-      if (!log._id && log.id) {
-        log._id = log.id;
-      }
-      if (!log._id) {
-        log._id = `log_${Date.now()}_${Math.random()}`;
-      }
-      return {
-        ...log,
-        cachedAt: now,
-      };
-    });
+    const logsWithTimestamp = logs.map((log) => ({
+      ...log,
+      cachedAt: now,
+    }));
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction([STORE_NAMES.CACHED_ACTIVITY_LOGS], 'readwrite');
@@ -608,11 +600,7 @@ export async function cacheActivityLogs(logs: CachedActivityLog[]): Promise<void
       store.clear();
 
       logsWithTimestamp.forEach((log) => {
-        try {
-          store.add(log);
-        } catch (itemError) {
-          console.error('Error adding activity log to cache:', log, itemError);
-        }
+        store.add(log);
       });
 
       transaction.onerror = () => reject(transaction.error);
@@ -651,18 +639,10 @@ export async function cacheSMSLogs(logs: CachedSMSLog[]): Promise<void> {
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const logsWithTimestamp = logs.map((log: any) => {
-      if (!log._id && log.id) {
-        log._id = log.id;
-      }
-      if (!log._id) {
-        log._id = `smslog_${Date.now()}_${Math.random()}`;
-      }
-      return {
-        ...log,
-        cachedAt: now,
-      };
-    });
+    const logsWithTimestamp = logs.map((log) => ({
+      ...log,
+      cachedAt: now,
+    }));
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction([STORE_NAMES.CACHED_SMS_LOGS], 'readwrite');
@@ -671,11 +651,7 @@ export async function cacheSMSLogs(logs: CachedSMSLog[]): Promise<void> {
       store.clear();
 
       logsWithTimestamp.forEach((log) => {
-        try {
-          store.add(log);
-        } catch (itemError) {
-          console.error('Error adding SMS log to cache:', log, itemError);
-        }
+        store.add(log);
       });
 
       transaction.onerror = () => reject(transaction.error);

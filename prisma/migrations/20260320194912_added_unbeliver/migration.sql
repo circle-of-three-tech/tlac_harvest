@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "SoulState" ADD VALUE 'UNBELIEVER';

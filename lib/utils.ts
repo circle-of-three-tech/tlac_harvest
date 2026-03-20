@@ -24,6 +24,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 };
 
 export const SOUL_STATE_LABELS: Record<SoulState, string> = {
+  UNBELIEVER: "Unbeliever",
   NEW_CONVERT: "New Convert",
   UNCHURCHED_BELIEVER: "Un-churched Believer",
   HUNGRY_BELIEVER: "Hungry Believer",

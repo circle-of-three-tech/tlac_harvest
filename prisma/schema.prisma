@@ -156,6 +156,7 @@ enum Role {
 }
 
 enum SoulState {
+  UNBELIEVER
   NEW_CONVERT
   UNCHURCHED_BELIEVER
   HUNGRY_BELIEVER

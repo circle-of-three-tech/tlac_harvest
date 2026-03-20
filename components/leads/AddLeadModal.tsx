@@ -19,7 +19,8 @@ const GENDER = [
   { value: "FEMALE", label: "Female"}
 ];
 
-const SOUL_STATES = [
+const SOUL_STATES = [ 
+  { value: "UNBELIEVER", label: "Unbeliever" },
   { value: "NEW_CONVERT", label: "New Convert" },
   { value: "UNCHURCHED_BELIEVER", label: "Un-churched Believer" },
   { value: "HUNGRY_BELIEVER", label: "Hungry Believer" },
@@ -42,7 +43,7 @@ export default function AddLeadModal({
     gender: "",
     location: "",
     additionalNotes: "",
-    soulState: "NEW_CONVERT",
+    soulState: "UNBELIEVER",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
