@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 interface ProgressBarProps {
   total: number;
+  
   current: number;
   /** Label shown above the bar */
   label?: string;

@@ -98,8 +98,8 @@ export default function EvangelistDashboardClient({
 
       <div>
         <ProgressBar
-          total={noOfSoulsTarget}
-          current={stats.total}
+          total={noOfSoulsTarget || 0}
+          current={stats.total || 0}
           label="Evangelism Progress"
           fillColor="#e1341e"
           trackColor="#fad9d4"
