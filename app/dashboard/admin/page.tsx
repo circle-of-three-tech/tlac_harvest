@@ -30,6 +30,7 @@ import {
   LEAD_STATUS_COLORS,
   SOUL_STATE_COLORS,
 } from "@/lib/utils";
+import ProgressBar from "@/components/evangelist/Progressbar";
 
 const ATTENDANCE_COLORS = {
   cold: "#93c5fd",
@@ -43,6 +44,8 @@ export default function AdminDashboardPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+ const[currentSoulsTarget, setCurrentSoulsTarget] = useState(0);
+  const [totalSoulsTarget, setTotalSoulsTarget] = useState(0);
 
   const fetchStats = async () => {
     setLoading(true);
@@ -52,6 +55,8 @@ export default function AdminDashboardPage() {
     const res = await fetch(`/api/admin/stats?${params}`);
     const data = await res.json();
     setStats(data);
+    setTotalSoulsTarget(data.totalSoulsTarget || 0);
+    setCurrentSoulsTarget(data.currentSoulsTarget || 0);
     setLoading(false);
   };
 
@@ -193,6 +198,21 @@ export default function AdminDashboardPage() {
         </div>
       ) : (
         <>
+         <div>
+         
+                <ProgressBar
+                  total={totalSoulsTarget || 0}
+                  current={currentSoulsTarget || 0}
+                  label="Evangelism Progress"
+                  fillColor="#e4a442"
+                  trackColor="#fae5bc"
+                  height={22}
+                  radius={8}
+                  showValues
+                  showPercent
+                  animated
+                />
+              </div>
           <div className="w-full flex flex-col md:flex-row mb-6 gap-4">
             {/* KPI Cards 1*/}
             <div className=" w-full bg-black/5 p-4 rounded-xl">

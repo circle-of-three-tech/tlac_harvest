@@ -44,7 +44,7 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
                         {user.name[0]}
                       </div>
-                      <span className="font-medium text-slate-900">{user.name}</span>
+                      <span className="font-medium text-slate-900">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</span>
                     </div>
                   </td>
                   <td className="text-slate-600">{user.email}</td>
@@ -75,7 +75,7 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
                     {user.name[0]}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{user.name}</div>
+                    <div className="font-semibold text-slate-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</div>
                     <div className="text-xs text-slate-400 truncate">{user.email}</div>
                   </div>
                 </div>

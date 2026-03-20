@@ -77,7 +77,7 @@ const EvangelistTable = ({ evangelists }: { evangelists: any[] }) => {
                   {user.name[0]}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-semibold text-earth-900 truncate">{user.name}</div>
+                  <div className="font-semibold text-earth-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</div>
                   <div className="text-xs text-slate-400 truncate">{user.email}</div>
                 </div>
               </div>

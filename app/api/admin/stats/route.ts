@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
       allLeads,
       evangelists,
       followups,
+      evangelistSoulsTarget,
+      currentSoulsConverted,
     ] = await Promise.all([
       prisma.lead.count({ where: dateFilter }),
       prisma.lead.groupBy({ by: ["status"], _count: true, where: dateFilter }),
@@ -45,6 +47,18 @@ export async function GET(req: NextRequest) {
       }),
       prisma.user.count({ where: { role: "EVANGELIST" } }),
       prisma.user.count({ where: { role: "FOLLOWUP" } }),
+      prisma.user.aggregate({
+        where: { role: "EVANGELIST" },
+        _sum: { noOfSoulsTarget: true },
+      }),
+      prisma.lead.count({
+        where: {
+          ...dateFilter,
+          soulState: {
+            in: ["NEW_CONVERT", "UNCHURCHED_BELIEVER", "HUNGRY_BELIEVER"],
+          },
+        },
+      }),
     ]);
 
     const cold = allLeads.filter(l => l.monthsConsistent < 2).length;
@@ -59,6 +73,8 @@ export async function GET(req: NextRequest) {
       soulStateCounts,
       churchCounts,
       attendance: { cold, lukewarm, hot },
+      totalSoulsTarget: evangelistSoulsTarget._sum.noOfSoulsTarget || 0,
+      currentSoulsTarget: currentSoulsConverted,
     });
   } catch (error: any) {
     console.error('GET /api/admin/stats error:', error);
