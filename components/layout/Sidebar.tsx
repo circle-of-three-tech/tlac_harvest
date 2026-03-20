@@ -106,18 +106,7 @@ export default function Sidebar() {
     <div className="flex justify-between h-full flex-col items-center">
       <div className="w-full">
         <div className="flex justify-between mt-4 items-center">
-          {/* Logo */}
-          {/* <div className="flex items-center gap-3 px-6 py-5"> */}
-            {/* <img
-              src="/applogo.jpg"
-              alt="The Harvest Logo"
-              className="w-auto h-14"
-            /> */}
-            {/* <div className="hidden sm:block">
-              <h1 className="font-display font-bold text-earth-900 text-lg leading-tight">
-                The Harvest
-              </h1>
-            </div> */}
+         
             <span className="flex gap-2 py-5 w-fit ml-7 items-center justify-center">
               <Wheat className="w-4 h-4 text-earth-500 mx-auto mb-2" />
               <h1 className="text-lg w-fit font-bold text-transparent bg-clip-text bg-gradient-to-r from-earth-300 to-earth-600">
@@ -127,7 +116,7 @@ export default function Sidebar() {
           {/* </div> */}
 
           {/* Close Btn */}
-          <div className="pb-4 px-4 md:hidden">
+          <div className="px-4 md:hidden">
             <button
               onClick={() => handleNavClick()}
               className="bg-white text-earth-500  p-2 rounded-xl"

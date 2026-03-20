@@ -4,12 +4,13 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, LogIn, AlertCircle, Wheat } from "lucide-react";
+import { Mail, Lock, LogIn, AlertCircle, Wheat, EyeOff, Eye } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,13 +94,20 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-earth-400" />
                 <input
-                  type="password"
+                   type={isPasswordVisible ? "text" : "password"}
                   required
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="••••••••"
                   className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
+                  <button
+                  type="button"
+                  onClick={() => setIsPasswordVisible((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-500 text-xs"
+                >
+                  {isPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 

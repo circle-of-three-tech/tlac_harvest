@@ -1,7 +1,7 @@
 // app/dashboard/followup/leads/page.tsx
 "use client";
 import { useState, useMemo } from "react";
-import { Search, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import LeadTable from "@/components/leads/LeadTable";
 import { useLeadsData, usePaginatedOfflineData } from "@/hooks/useOfflineData";
 import { useSync } from "@/components/SyncProvider";

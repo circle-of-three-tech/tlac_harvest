@@ -101,7 +101,7 @@ export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = 
             {paginatedLeads.map((lead, index) => {
               const att = getAttendanceStatus(lead.monthsConsistent ?? 0);
               return (
-                <tr key={lead.id} className={`hover:bg-slate-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`} onClick={() => setSelectedLead(lead)}>
+                <tr key={index} className={`hover:bg-slate-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`} onClick={() => setSelectedLead(lead)}>
                   <td>
                     <div className="font-medium text-slate-900">{lead.fullName}</div>
                     <div className="text-xs text-slate-400">{AGE_RANGE_LABELS[lead.ageRange as keyof typeof AGE_RANGE_LABELS]}</div>

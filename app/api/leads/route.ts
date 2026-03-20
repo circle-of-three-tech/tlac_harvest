@@ -21,57 +21,65 @@ const createLeadSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "10");
-  const dateFrom = searchParams.get("dateFrom");
-  const dateTo = searchParams.get("dateTo");
-  const status = searchParams.get("status");
-  const soulState = searchParams.get("soulState");
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const status = searchParams.get("status");
+    const soulState = searchParams.get("soulState");
 
-  const user = session.user as any;
-  const skip = (page - 1) * limit;
+    const user = session.user as any;
+    const skip = (page - 1) * limit;
 
-  const where: any = {};
+    const where: any = {};
 
-  if (user.role === "FOLLOWUP") {
-  where.assignedToId = user.id;
-}
+    if (user.role === "FOLLOWUP") {
+      where.assignedToId = user.id;
+    }
 
-if (user.role === "EVANGELIST") {
-  where.addedById = user.id;
-}
-  if (dateFrom || dateTo) {
-    where.createdAt = {};
-    if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-    if (dateTo) where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
-  }
+    if (user.role === "EVANGELIST") {
+      where.addedById = user.id;
+    }
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
+    }
 
-  if (status) where.status = status;
-  if (soulState) where.soulState = soulState;
+    if (status) where.status = status;
+    if (soulState) where.soulState = soulState;
 
-  const [leads, total] = await Promise.all([
-    prisma.lead.findMany({
-      where,
-      include: {
-        addedBy: { select: { id: true, name: true, email: true } },
-        assignedTo: { select: { id: true, name: true, email: true } },
-        notes: {
-          include: { user: { select: { id: true, name: true } } },
-          orderBy: { createdAt: "desc" },
+    const [leads, total] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        include: {
+          addedBy: { select: { id: true, name: true, email: true } },
+          assignedTo: { select: { id: true, name: true, email: true } },
+          notes: {
+            include: { user: { select: { id: true, name: true } } },
+            orderBy: { createdAt: "desc" },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    }),
-    prisma.lead.count({ where }),
-  ]);
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.lead.count({ where }),
+    ]);
 
-  return NextResponse.json({ leads, total, page, limit });
+    return NextResponse.json({ leads, total, page, limit });
+  } catch (error: any) {
+    console.error('GET /api/leads error:', error);
+    return NextResponse.json(
+      { error: "Failed to fetch leads", details: error.message },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {

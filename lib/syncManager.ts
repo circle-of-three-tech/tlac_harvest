@@ -55,9 +55,9 @@ export type SyncStatusCallback = (status: SyncStatus) => void;
 
 let syncStatusCallbacks: SyncStatusCallback[] = [];
 
-// FIX 1: Don't initialize isOnline at module level — it may run on the server
+// Don't initialize isOnline at module level — it may run on the server
 // where navigator is undefined or unreliable. Start as true and let the first
-// health check correct it. 
+// health check correct it.
 const currentSyncStatus: SyncStatus = {
   isOnline: true,
   isSyncing: false,
@@ -66,11 +66,30 @@ const currentSyncStatus: SyncStatus = {
 };
 let healthCheckInterval: NodeJS.Timeout | null = null;
 
+// FIX: Track the current user's role so admin-only endpoints are only called
+// when appropriate. Set via setCurrentUserRole() from SyncProvider on mount.
+let currentUserRole: string | null = null;
+
+/**
+ * Call this from SyncProvider (or wherever you have session data) so the sync
+ * manager knows which endpoints it is allowed to call.
+ */
+export function setCurrentUserRole(role: string | null): void {
+  currentUserRole = role;
+}
+
+function isAdmin(): boolean {
+  return currentUserRole === 'ADMIN';
+}
+
 /**
  * Check actual network connectivity by making a lightweight request.
  *
- * FIX 2: Accept ANY HTTP response as "online". Only a thrown network error
+ * Accept ANY HTTP response as "online". Only a thrown network error
  * (no response at all) means the device is truly offline.
+ *
+ * Ignore 500 errors from /api/health — these usually mean the database
+ * is down, not the network. We only care if the fetch itself fails.
  */
 async function verifyNetworkConnectivity(): Promise<boolean> {
   // Guard: can't run fetch on the server during SSR
@@ -78,21 +97,24 @@ async function verifyNetworkConnectivity(): Promise<boolean> {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    // FIX 3: Use cache: 'no-store' so a cached response doesn't mask real
-    // offline state.
-    await fetch('/api/health', {
+    // Use cache: 'no-store' so a cached response doesn't mask real offline state.
+    const response = await fetch('/api/health', {
       method: 'HEAD',
       signal: controller.signal,
       cache: 'no-store',
     });
 
     clearTimeout(timeoutId);
-    // Any response (even 4xx/5xx) proves the network stack is working.
+    // Any response, even 500 (database down), means network is working.
+    // Only thrown errors (network failure) mean we're truly offline.
+    console.log(`Health check: ${response.status} - Network is up`);
     return true;
-  } catch {
+  } catch (error) {
     // AbortError = timeout, TypeError = no network — both mean offline.
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.log(`Health check failed: ${errorMsg} - Network appears down`);
     return false;
   }
 }
@@ -121,7 +143,7 @@ async function performHealthCheck(): Promise<void> {
         console.log('Network disconnection detected');
       }
     } else {
-      // Still notify so counts update reach subscribers
+      // Still notify so count updates reach subscribers
       notifyStatusChange();
     }
   } catch (error) {
@@ -150,10 +172,13 @@ export async function initializeSyncManager(): Promise<void> {
     currentSyncStatus.isOnline = isActuallyOnline;
     notifyStatusChange();
 
-    // Periodic check every 10 seconds as fallback for stuck navigator.onLine
+    // Periodic check every 30 seconds as fallback for stuck navigator.onLine.
+    // FIX: Increased from 10s — the old 10s interval combined with each check
+    // triggering syncOfflineData (which calls refreshCachedData → multiple API
+    // fetches) was a major contributor to the request flood.
     healthCheckInterval = setInterval(() => {
       performHealthCheck();
-    }, 10000);
+    }, 30000);
 
     if (isActuallyOnline) {
       await syncOfflineData();
@@ -196,7 +221,6 @@ export function getSyncStatus(): SyncStatus {
 
 /**
  * Handle online event.
- *
  * Verify with a real request before marking as online and starting sync.
  */
 async function handleOnline(): Promise<void> {
@@ -229,158 +253,83 @@ function notifyStatusChange(): void {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL helpers — these do the real work but do NOT touch isSyncing.
+// Only the public-facing functions (syncOfflineLeads, syncOfflineData) own the
+// flag, which prevents the double-reset bug where syncOfflineLeads' finally
+// block was clearing isSyncing while syncOfflineData was still running.
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Sync all pending offline leads to the server
+ * Internal: sync pending offline leads without touching isSyncing flag.
  */
-export async function syncOfflineLeads(): Promise<void> {
-  if (currentSyncStatus.isSyncing || !currentSyncStatus.isOnline) {
+async function _syncOfflineLeadsInternal(): Promise<void> {
+  const pendingLeads = await getPendingLeads();
+
+  if (pendingLeads.length === 0) {
     return;
   }
 
-  currentSyncStatus.isSyncing = true;
-  notifyStatusChange();
+  console.log(`Syncing ${pendingLeads.length} offline leads...`);
 
-  try {
-    const pendingLeads = await getPendingLeads();
+  let successCount = 0;
+  let failureCount = 0;
 
-    if (pendingLeads.length === 0) {
-      currentSyncStatus.isSyncing = false;
+  for (const lead of pendingLeads) {
+    try {
+      await updateLeadSyncStatus(lead.id, 'syncing');
       notifyStatusChange();
-      return;
-    }
 
-    console.log(`Syncing ${pendingLeads.length} offline leads...`);
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: lead.fullName,
+          ageRange: lead.ageRange,
+          phone: lead.phone,
+          address: lead.address,
+          location: lead.location,
+          additionalNotes: lead.additionalNotes,
+          soulState: lead.soulState,
+          gender: lead.gender,
+        }),
+      });
 
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (const lead of pendingLeads) {
-      try {
-        await updateLeadSyncStatus(lead.id, 'syncing');
-        notifyStatusChange();
-
-        const response = await fetch('/api/leads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: lead.fullName,
-            ageRange: lead.ageRange,
-            phone: lead.phone,
-            address: lead.address,
-            location: lead.location,
-            additionalNotes: lead.additionalNotes,
-            soulState: lead.soulState,
-            gender: lead.gender,
-          }),
-        });
-
-        if (response.ok) {
-          await deleteOfflineLead(lead.id);
-          successCount++;
-          console.log(`✓ Synced lead: ${lead.fullName}`);
-        } else {
-          // FIX 6: Guard against response.json() throwing on non-JSON error bodies
-          const errorData = await response.json().catch(() => ({}));
-          const errorMsg = errorData.error || `HTTP ${response.status}`;
-          await updateLeadSyncStatus(lead.id, 'failed', errorMsg);
-          failureCount++;
-          console.error(`✗ Failed to sync lead ${lead.fullName}:`, errorMsg);
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Network error';
+      if (response.ok) {
+        await deleteOfflineLead(lead.id);
+        successCount++;
+        console.log(`✓ Synced lead: ${lead.fullName}`);
+      } else {
+        // Guard against response.json() throwing on non-JSON error bodies
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || `HTTP ${response.status}`;
         await updateLeadSyncStatus(lead.id, 'failed', errorMsg);
         failureCount++;
-        console.error(`✗ Error syncing lead ${lead.fullName}:`, error);
+        console.error(`✗ Failed to sync lead ${lead.fullName}:`, errorMsg);
       }
-
-      notifyStatusChange();
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Network error';
+      await updateLeadSyncStatus(lead.id, 'failed', errorMsg);
+      failureCount++;
+      console.error(`✗ Error syncing lead ${lead.fullName}:`, error);
     }
 
-    const remaining = await getPendingLeads();
-    currentSyncStatus.pendingCount = remaining.length;
-    currentSyncStatus.lastSyncTime = new Date();
-    currentSyncStatus.error =
-      failureCount > 0 ? `${failureCount} lead(s) failed to sync` : undefined;
-
-    console.log(`Sync complete: ${successCount} succeeded, ${failureCount} failed`);
-  } catch (error) {
-    currentSyncStatus.error =
-      error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error during sync:', error);
-  } finally {
-    currentSyncStatus.isSyncing = false;
     notifyStatusChange();
   }
+
+  const remaining = await getPendingLeads();
+  currentSyncStatus.pendingCount = remaining.length;
+  currentSyncStatus.lastSyncTime = new Date();
+  currentSyncStatus.error =
+    failureCount > 0 ? `${failureCount} lead(s) failed to sync` : undefined;
+
+  console.log(`Lead sync complete: ${successCount} succeeded, ${failureCount} failed`);
 }
 
 /**
- * Manually trigger sync (exposed for manual sync button)
+ * Internal: sync queued operations without touching isSyncing flag.
  */
-export async function triggerManualSync(): Promise<void> {
-  if (!currentSyncStatus.isOnline) {
-    throw new Error('Device is offline. Cannot sync.');
-  }
-  if (currentSyncStatus.isSyncing) {
-    throw new Error('Sync is already in progress.');
-  }
-  await syncOfflineData();
-}
-
-/**
- * Force check network connectivity (useful for manual refresh)
- */
-export async function forceCheckNetwork(): Promise<boolean> {
-  const isOnline = await verifyNetworkConnectivity();
-
-  if (isOnline !== currentSyncStatus.isOnline) {
-    currentSyncStatus.isOnline = isOnline;
-    notifyStatusChange();
-
-    if (isOnline) {
-      await syncOfflineData();
-    }
-  }
-
-  return isOnline;
-}
-
-// ==================== NEW OFFLINE DATA SYNC FUNCTIONS ====================
-
-/**
- * Master sync function - coordinates all offline data syncing
- * Handles: offline lead creation, queued operations, and caching
- */
-export async function syncOfflineData(): Promise<void> {
-  if (currentSyncStatus.isSyncing || !currentSyncStatus.isOnline) {
-    return;
-  }
-
-  currentSyncStatus.isSyncing = true;
-  notifyStatusChange();
-
-  try {
-    // Sync offline leads (existing)
-    await syncOfflineLeads();
-
-    // Sync queued operations (new)
-    await syncQueuedOperations();
-
-    // Refresh cached data
-    await refreshCachedData();
-
-    currentSyncStatus.lastSyncTime = new Date();
-  } catch (error) {
-    console.error('Error during full data sync:', error);
-  } finally {
-    currentSyncStatus.isSyncing = false;
-    notifyStatusChange();
-  }
-}
-
-/**
- * Sync all queued operations (updates, deletes, notes, reassignments)
- */
-export async function syncQueuedOperations(): Promise<void> {
+async function _syncQueuedOperationsInternal(): Promise<void> {
   const pendingOps = await getDedupedOperations();
 
   if (pendingOps.length === 0) {
@@ -401,7 +350,6 @@ export async function syncQueuedOperations(): Promise<void> {
 
       switch (op.type) {
         case 'update': {
-          // Update lead
           response = await fetch(`/api/leads/${op.resourceId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -412,7 +360,6 @@ export async function syncQueuedOperations(): Promise<void> {
         }
 
         case 'delete': {
-          // Delete lead
           response = await fetch(`/api/leads/${op.resourceId}`, {
             method: 'DELETE',
           });
@@ -421,7 +368,6 @@ export async function syncQueuedOperations(): Promise<void> {
         }
 
         case 'addNote': {
-          // Add note to lead
           response = await fetch(`/api/leads/${op.payload.leadId}/notes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -432,7 +378,6 @@ export async function syncQueuedOperations(): Promise<void> {
         }
 
         case 'reassign': {
-          // Reassign lead
           response = await fetch(`/api/leads/${op.resourceId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -440,6 +385,11 @@ export async function syncQueuedOperations(): Promise<void> {
           });
           syncSuccess = response.ok;
           break;
+        }
+
+        default: {
+          console.warn(`Unknown operation type: ${(op as any).type} — skipping`);
+          continue;
         }
       }
 
@@ -475,8 +425,135 @@ export async function syncQueuedOperations(): Promise<void> {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC sync functions — these own the isSyncing flag
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Refresh all cached data from server
+ * Sync pending offline leads only.
+ * Safe to call standalone — manages isSyncing flag independently.
+ */
+export async function syncOfflineLeads(): Promise<void> {
+  if (currentSyncStatus.isSyncing || !currentSyncStatus.isOnline) {
+    return;
+  }
+
+  currentSyncStatus.isSyncing = true;
+  notifyStatusChange();
+
+  try {
+    await _syncOfflineLeadsInternal();
+  } catch (error) {
+    currentSyncStatus.error =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error during lead sync:', error);
+  } finally {
+    currentSyncStatus.isSyncing = false;
+    notifyStatusChange();
+  }
+}
+
+/**
+ * Sync all queued operations only.
+ * Safe to call standalone — manages isSyncing flag independently.
+ */
+export async function syncQueuedOperations(): Promise<void> {
+  if (currentSyncStatus.isSyncing || !currentSyncStatus.isOnline) {
+    return;
+  }
+
+  currentSyncStatus.isSyncing = true;
+  notifyStatusChange();
+
+  try {
+    await _syncQueuedOperationsInternal();
+  } catch (error) {
+    currentSyncStatus.error =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error during operation sync:', error);
+  } finally {
+    currentSyncStatus.isSyncing = false;
+    notifyStatusChange();
+  }
+}
+
+/**
+ * Master sync function — coordinates all offline data syncing.
+ * Handles: offline lead creation, queued operations, and cache refresh.
+ *
+ * FIX: Previously this called syncOfflineLeads() and syncQueuedOperations()
+ * which each had their own isSyncing guards and finally resets. That caused
+ * the flag to be cleared mid-execution, allowing concurrent syncs to start
+ * and producing the request flood seen in the logs.
+ *
+ * Now it calls the internal helpers directly so only ONE isSyncing flag
+ * lifecycle exists for the entire orchestrated sync.
+ */
+export async function syncOfflineData(): Promise<void> {
+  if (currentSyncStatus.isSyncing || !currentSyncStatus.isOnline) {
+    return;
+  }
+
+  currentSyncStatus.isSyncing = true;
+  notifyStatusChange();
+
+  try {
+    await _syncOfflineLeadsInternal();
+    await _syncQueuedOperationsInternal();
+    await refreshCachedData();
+
+    currentSyncStatus.lastSyncTime = new Date();
+  } catch (error) {
+    currentSyncStatus.error =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error during full data sync:', error);
+  } finally {
+    currentSyncStatus.isSyncing = false;
+    notifyStatusChange();
+  }
+}
+
+/**
+ * Manually trigger a full sync (e.g. from a "Sync now" button).
+ */
+export async function triggerManualSync(): Promise<void> {
+  if (!currentSyncStatus.isOnline) {
+    throw new Error('Device is offline. Cannot sync.');
+  }
+  if (currentSyncStatus.isSyncing) {
+    throw new Error('Sync is already in progress.');
+  }
+  await syncOfflineData();
+}
+
+/**
+ * Force check network connectivity (useful for manual refresh).
+ */
+export async function forceCheckNetwork(): Promise<boolean> {
+  const isOnline = await verifyNetworkConnectivity();
+
+  if (isOnline !== currentSyncStatus.isOnline) {
+    currentSyncStatus.isOnline = isOnline;
+    notifyStatusChange();
+
+    if (isOnline) {
+      await syncOfflineData();
+    }
+  }
+
+  return isOnline;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cache refresh functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Refresh all cached data from the server.
+ *
+ * FIX: Admin-only endpoints (/api/admin/*) are now gated behind isAdmin().
+ * Previously every user triggered 401/403 errors on these endpoints on every
+ * sync cycle, which was noisy and wasteful.
  */
 export async function refreshCachedData(): Promise<void> {
   if (!currentSyncStatus.isOnline) {
@@ -484,17 +561,20 @@ export async function refreshCachedData(): Promise<void> {
   }
 
   try {
-    // Load all dashboard data in parallel
-    await Promise.all([
+    const commonRequests = [
       loadCachedLeads(),
       loadCachedUsers(),
       loadCachedAnnouncements(),
-      loadCachedStats(),
-      loadCachedActivityLogs(),
-      loadCachedSMSLogs(),
-    ]).catch((error) => {
+    ];
+
+    // Only request admin data if the current user has the ADMIN role
+    const adminRequests = isAdmin()
+      ? [loadCachedStats(), loadCachedActivityLogs(), loadCachedSMSLogs()]
+      : [];
+
+    await Promise.all([...commonRequests, ...adminRequests]).catch((error) => {
       console.warn('Error refreshing some cached data:', error);
-      // Don't throw - partial cache is better than no cache
+      // Don't throw — partial cache is better than no cache
     });
   } catch (error) {
     console.error('Error refreshing cached data:', error);
@@ -502,7 +582,11 @@ export async function refreshCachedData(): Promise<void> {
 }
 
 /**
- * Load and cache leads from API
+ * Load and cache leads from API.
+ *
+ * FIX: Map lead.id (Prisma) with fallback to lead._id (legacy/MongoDB) so
+ * the _id field is always populated and cacheLeads() doesn't silently skip
+ * every record.
  */
 export async function loadCachedLeads(): Promise<void> {
   try {
@@ -516,7 +600,8 @@ export async function loadCachedLeads(): Promise<void> {
 
     const data = await response.json();
     const leads: CachedLead[] = (data.leads || []).map((lead: any) => ({
-      _id: lead._id,
+      // FIX: Prisma returns `id`, not `_id`. Fall back to _id for safety.
+      _id: lead?.id ?? lead?._id,
       fullName: lead.fullName,
       ageRange: lead.ageRange,
       phone: lead.phone,
@@ -538,7 +623,9 @@ export async function loadCachedLeads(): Promise<void> {
 }
 
 /**
- * Load and cache users from API
+ * Load and cache users from API.
+ *
+ * FIX: Map user.id (Prisma) with fallback to user._id (legacy/MongoDB).
  */
 export async function loadCachedUsers(): Promise<void> {
   try {
@@ -552,7 +639,8 @@ export async function loadCachedUsers(): Promise<void> {
 
     const data = await response.json();
     const users: CachedUser[] = (data.users || []).map((user: any) => ({
-      _id: user._id,
+      // FIX: Prisma returns `id`, not `_id`. Fall back to _id for safety.
+      _id: user?.id ?? user?._id,
       name: user.name,
       email: user.email,
       phone: user.phone || '',
@@ -568,7 +656,7 @@ export async function loadCachedUsers(): Promise<void> {
 }
 
 /**
- * Load and cache announcements from API
+ * Load and cache announcements from API.
  */
 export async function loadCachedAnnouncements(): Promise<void> {
   try {
@@ -583,7 +671,7 @@ export async function loadCachedAnnouncements(): Promise<void> {
     const data = await response.json();
     const announcements: CachedAnnouncement[] = (data.announcements || []).map(
       (ann: any) => ({
-        _id: ann._id,
+        _id: ann?.id ?? ann?._id,
         title: ann.title,
         message: ann.message,
         priority: ann.priority,
@@ -599,7 +687,8 @@ export async function loadCachedAnnouncements(): Promise<void> {
 }
 
 /**
- * Load and cache admin stats
+ * Load and cache admin stats.
+ * Only call this when the user is an admin (enforced via refreshCachedData).
  */
 export async function loadCachedStats(): Promise<void> {
   try {
@@ -620,7 +709,8 @@ export async function loadCachedStats(): Promise<void> {
 }
 
 /**
- * Load and cache activity logs
+ * Load and cache activity logs.
+ * Only call this when the user is an admin (enforced via refreshCachedData).
  */
 export async function loadCachedActivityLogs(): Promise<void> {
   try {
@@ -634,7 +724,7 @@ export async function loadCachedActivityLogs(): Promise<void> {
 
     const data = await response.json();
     const logs: CachedActivityLog[] = (data.logs || []).map((log: any) => ({
-      _id: log._id,
+      _id: log?.id ?? log?._id,
       userId: log.userId,
       userName: log.userName,
       action: log.action,
@@ -650,7 +740,8 @@ export async function loadCachedActivityLogs(): Promise<void> {
 }
 
 /**
- * Load and cache SMS logs
+ * Load and cache SMS logs.
+ * Only call this when the user is an admin (enforced via refreshCachedData).
  */
 export async function loadCachedSMSLogs(): Promise<void> {
   try {
@@ -664,7 +755,7 @@ export async function loadCachedSMSLogs(): Promise<void> {
 
     const data = await response.json();
     const logs: CachedSMSLog[] = (data.smsLogs || []).map((log: any) => ({
-      _id: log._id,
+      _id: log.id ?? log._id,
       phone: log.phone,
       message: log.message,
       status: log.status,
@@ -679,11 +770,12 @@ export async function loadCachedSMSLogs(): Promise<void> {
 }
 
 /**
- * Clear all offline/cached data (called on logout)
+ * Clear all offline/cached data (call on logout).
  */
 export async function clearOfflineData(): Promise<void> {
   try {
     await clearAllCachedData();
+    currentUserRole = null;
     console.log('Cleared all offline data');
   } catch (error) {
     console.error('Error clearing offline data:', error);

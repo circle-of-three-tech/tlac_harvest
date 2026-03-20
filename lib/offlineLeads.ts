@@ -345,10 +345,20 @@ export async function cacheLeads(leads: CachedLead[]): Promise<void> {
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const leadsWithTimestamp = leads.map((lead) => ({
-      ...lead,
-      cachedAt: now,
-    }));
+    const leadsWithTimestamp = leads.map((lead: any) => {
+      // Ensure _id exists for keyPath (fallback to id if needed)
+      if (!lead._id && lead.id) {
+        lead._id = lead.id;
+      }
+      if (!lead._id) {
+        console.warn('Lead missing _id:', lead);
+        lead._id = `lead_${Date.now()}_${Math.random()}`;
+      }
+      return {
+        ...lead,
+        cachedAt: now,
+      };
+    });
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction([STORE_NAMES.CACHED_LEADS], 'readwrite');
@@ -358,7 +368,11 @@ export async function cacheLeads(leads: CachedLead[]): Promise<void> {
       store.clear();
 
       leadsWithTimestamp.forEach((lead) => {
-        store.add(lead);
+        try {
+          store.add(lead);
+        } catch (itemError) {
+          console.error('Error adding lead to cache:', lead, itemError);
+        }
       });
 
       transaction.onerror = () => reject(transaction.error);
@@ -397,10 +411,20 @@ export async function cacheUsers(users: CachedUser[]): Promise<void> {
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const usersWithTimestamp = users.map((user) => ({
-      ...user,
-      cachedAt: now,
-    }));
+    const usersWithTimestamp = users.map((user: any) => {
+      // Ensure _id exists for keyPath
+      if (!user._id && user.id) {
+        user._id = user.id;
+      }
+      if (!user._id) {
+        console.warn('User missing _id:', user);
+        user._id = `user_${Date.now()}_${Math.random()}`;
+      }
+      return {
+        ...user,
+        cachedAt: now,
+      };
+    });
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction([STORE_NAMES.CACHED_USERS], 'readwrite');
@@ -409,7 +433,11 @@ export async function cacheUsers(users: CachedUser[]): Promise<void> {
       store.clear();
 
       usersWithTimestamp.forEach((user) => {
-        store.add(user);
+        try {
+          store.add(user);
+        } catch (itemError) {
+          console.error('Error adding user to cache:', user, itemError);
+        }
       });
 
       transaction.onerror = () => reject(transaction.error);
@@ -448,10 +476,18 @@ export async function cacheAnnouncements(announcements: CachedAnnouncement[]): P
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const announcementsWithTimestamp = announcements.map((ann) => ({
-      ...ann,
-      cachedAt: now,
-    }));
+    const announcementsWithTimestamp = announcements.map((ann: any) => {
+      if (!ann._id && ann.id) {
+        ann._id = ann.id;
+      }
+      if (!ann._id) {
+        ann._id = `announcement_${Date.now()}_${Math.random()}`;
+      }
+      return {
+        ...ann,
+        cachedAt: now,
+      };
+    });
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(
@@ -463,7 +499,11 @@ export async function cacheAnnouncements(announcements: CachedAnnouncement[]): P
       store.clear();
 
       announcementsWithTimestamp.forEach((ann) => {
-        store.add(ann);
+        try {
+          store.add(ann);
+        } catch (itemError) {
+          console.error('Error adding announcement to cache:', ann, itemError);
+        }
       });
 
       transaction.onerror = () => reject(transaction.error);
@@ -548,10 +588,18 @@ export async function cacheActivityLogs(logs: CachedActivityLog[]): Promise<void
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const logsWithTimestamp = logs.map((log) => ({
-      ...log,
-      cachedAt: now,
-    }));
+    const logsWithTimestamp = logs.map((log: any) => {
+      if (!log._id && log.id) {
+        log._id = log.id;
+      }
+      if (!log._id) {
+        log._id = `log_${Date.now()}_${Math.random()}`;
+      }
+      return {
+        ...log,
+        cachedAt: now,
+      };
+    });
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction([STORE_NAMES.CACHED_ACTIVITY_LOGS], 'readwrite');
@@ -560,7 +608,11 @@ export async function cacheActivityLogs(logs: CachedActivityLog[]): Promise<void
       store.clear();
 
       logsWithTimestamp.forEach((log) => {
-        store.add(log);
+        try {
+          store.add(log);
+        } catch (itemError) {
+          console.error('Error adding activity log to cache:', log, itemError);
+        }
       });
 
       transaction.onerror = () => reject(transaction.error);
@@ -599,10 +651,18 @@ export async function cacheSMSLogs(logs: CachedSMSLog[]): Promise<void> {
   try {
     const database = await getIndexedDB();
     const now = Date.now();
-    const logsWithTimestamp = logs.map((log) => ({
-      ...log,
-      cachedAt: now,
-    }));
+    const logsWithTimestamp = logs.map((log: any) => {
+      if (!log._id && log.id) {
+        log._id = log.id;
+      }
+      if (!log._id) {
+        log._id = `smslog_${Date.now()}_${Math.random()}`;
+      }
+      return {
+        ...log,
+        cachedAt: now,
+      };
+    });
 
     return new Promise((resolve, reject) => {
       const transaction = database.transaction([STORE_NAMES.CACHED_SMS_LOGS], 'readwrite');
@@ -611,7 +671,11 @@ export async function cacheSMSLogs(logs: CachedSMSLog[]): Promise<void> {
       store.clear();
 
       logsWithTimestamp.forEach((log) => {
-        store.add(log);
+        try {
+          store.add(log);
+        } catch (itemError) {
+          console.error('Error adding SMS log to cache:', log, itemError);
+        }
       });
 
       transaction.onerror = () => reject(transaction.error);
