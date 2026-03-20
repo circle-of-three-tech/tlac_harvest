@@ -1,85 +1,113 @@
 // app/dashboard/evangelist/leads/page.tsx
 "use client";
-import { useState, useEffect } from "react";
-import { UserRoundPlus, Search, Filter } from "lucide-react";
+import { useState, useMemo } from "react";
+import { UserRoundPlus, Search, AlertCircle } from "lucide-react";
 import LeadTable from "@/components/leads/LeadTable";
 import AddLeadModal from "@/components/leads/AddLeadModal";
+import { useLeadsData, usePaginatedOfflineData } from "@/hooks/useOfflineData";
+import { useSync } from "@/components/SyncProvider";
+
+const ITEMS_PER_PAGE = 10;
 
 export default function EvangelistLeadsPage() {
-  const [leads, setLeads] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [search, setSearch] = useState("");
+  const { data: allLeads, loading, error, isOffline } = useLeadsData();
+  const { isOnline } = useSync();
 
-  const fetchLeads = async () => {
-    setLoading(true);
-    const res = await fetch(`/api/leads?page=${page}&limit=10`);
-    const data = await res.json();
-    setLeads(data.leads ?? []);
-    setTotal(data.total ?? 0);
-    setLoading(false);
-  };
+  // Filter leads content-wise
+  const filteredLeads = useMemo(() => {
+    return (allLeads || []).filter(
+      (l) =>
+        l.fullName.toLowerCase().includes(search.toLowerCase()) ||
+        l.location?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [allLeads, search]);
 
-  useEffect(() => { fetchLeads(); }, [page]);
-
-  const filtered = leads.filter(l =>
-    l.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    l.location.toLowerCase().includes(search.toLowerCase())
+  // Paginate
+  const { data: paginatedLeads, totalPages } = usePaginatedOfflineData(
+    filteredLeads,
+    ITEMS_PER_PAGE,
+    page
   );
-
-  const totalPages = Math.ceil(total / 10);
 
   return (
     <div>
       <div className="pt-12 page-header flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="page-title">My Leads</h1>
-          <p className="page-subtitle">{total} leads added by you</p>
+          <p className="page-subtitle">
+            {filteredLeads.length} leads
+            {isOffline && " (Offline Mode)"}
+          </p>
         </div>
-        <button onClick={() => setShowAddModal(true)} className="harvest-btn-primary w-full sm:w-auto">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="harvest-btn-primary w-full sm:w-auto"
+        >
           <UserRoundPlus className="w-4 h-4" /> Add Lead
         </button>
       </div>
 
+      {error && isOnline && (
+        <div className="harvest-card mb-4 bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-lg flex gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Unable to load leads from server</p>
+            <p className="text-xs mt-1">
+              {isOffline ? "Showing cached data" : "Please check your connection"}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="harvest-card overflow-hidden">
         <div className="flex items-center gap-3 py-4 border-b border-harvest-100">
           <div className="relative flex-1">
-            {/* <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-earth-400" /> */}
             <input
               type="text"
               placeholder="Search by name or location..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="harvest-input pl-9"
             />
           </div>
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-slate-400 bg-white">Loading leads...</div>
+          <div className="py-16 text-center text-slate-400 bg-white">
+            Loading leads...
+          </div>
+        ) : filteredLeads.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 bg-white">
+            No leads found
+          </div>
         ) : (
           <LeadTable
-            leads={filtered}
-            onLeadUpdated={(updated) => setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))}
+            leads={paginatedLeads}
+            onLeadUpdated={(updated) => {
+              // Leads will be refetched on sync
+            }}
           />
         )}
 
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 sm:px-6 py-4 border-t border-harvest-100">
-            <span className="text-sm text-slate-500">Page {page} of {totalPages}</span>
+            <span className="text-sm text-slate-500">
+              Page {page} of {totalPages}
+            </span>
             <div className="flex gap-2 w-full sm:w-auto">
               <button
                 disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
+                onClick={() => setPage((p) => p - 1)}
                 className="harvest-btn-secondary text-xs disabled:opacity-40"
               >
                 Previous
               </button>
               <button
                 disabled={page === totalPages}
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
                 className="harvest-btn-secondary text-xs disabled:opacity-40"
               >
                 Next
@@ -93,9 +121,8 @@ export default function EvangelistLeadsPage() {
         <AddLeadModal
           onClose={() => setShowAddModal(false)}
           onSuccess={(newLead) => {
-            setLeads(prev => [newLead, ...prev]);
-            setTotal(t => t + 1);
             setShowAddModal(false);
+            // Leads will be updated on sync or cache refresh
           }}
         />
       )}

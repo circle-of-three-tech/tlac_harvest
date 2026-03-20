@@ -13,6 +13,7 @@ import {
   triggerManualSync,
   forceCheckNetwork,
   getSyncStatus,
+  clearOfflineData,
   SyncStatus,
 } from '@/lib/syncManager';
 
@@ -20,10 +21,12 @@ interface SyncContextType {
   isSyncing: boolean;
   isOnline: boolean;
   pendingCount: number;
+  queuedOperationsCount: number;
   lastSyncTime?: Date;
   error?: string;
   manualSync: () => Promise<void>;
   checkNetwork: () => Promise<boolean>;
+  clearCache: () => Promise<void>;
   isReady: boolean;
 }
 
@@ -38,6 +41,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     isOnline: true,
     isSyncing: false,
     pendingCount: 0,
+    queuedOperationsCount: 0,
   });
   const [isReady, setIsReady] = useState(false);
   const [manualSyncError, setManualSyncError] = useState<string>();
@@ -87,14 +91,27 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleClearCache = async () => {
+    try {
+      await clearOfflineData();
+      setManualSyncError(undefined);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setManualSyncError(message);
+      throw error;
+    }
+  };
+
   const contextValue: SyncContextType = {
     isSyncing: syncStatus.isSyncing,
     isOnline: syncStatus.isOnline,
     pendingCount: syncStatus.pendingCount,
+    queuedOperationsCount: syncStatus.queuedOperationsCount,
     lastSyncTime: syncStatus.lastSyncTime,
     error: syncStatus.error || manualSyncError,
     manualSync: handleManualSync,
     checkNetwork: handleCheckNetwork,
+    clearCache: handleClearCache,
     isReady,
   };
 
@@ -110,4 +127,11 @@ export function useSyncStatus() {
     throw new Error('useSyncStatus must be used within SyncProvider');
   }
   return context;
+}
+
+/**
+ * Alias for useSyncStatus for convenience
+ */
+export function useSync() {
+  return useSyncStatus();
 }
