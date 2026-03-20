@@ -46,7 +46,7 @@ const LeadsModal = ({ user, isOpen, onClose }: LeadsModalProps) => {
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: String(pageSize),
-        assignedToId: user.id,
+        [user.role === "FOLLOWUP" ? "assignedToId" : "addedById"]: user.id,
       });
 
       const res = await fetch(`/api/leads?${params}`);
