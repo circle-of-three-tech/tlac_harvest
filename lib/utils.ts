@@ -53,6 +53,7 @@ export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
 };
 
 export const SOUL_STATE_COLORS: Record<SoulState, string> = {
+  UNBELIEVER: "#6b7280",
   NEW_CONVERT: "#ef4444",
   UNCHURCHED_BELIEVER: "#f59e0b",
   HUNGRY_BELIEVER: "#10b981",
