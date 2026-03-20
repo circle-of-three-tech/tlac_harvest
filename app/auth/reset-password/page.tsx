@@ -88,7 +88,7 @@ const PasswordResetForm = () =>{
             backgroundImage: `radial-gradient(circle at 60% 40%, #ff9d37 0%, transparent 50%),
                               radial-gradient(circle at 20% 70%, #ffc070 0%, transparent 40%)`,
           }}
-        />
+        /> 
       </div>
 
       <div className="w-full max-w-md relative">

@@ -15,7 +15,7 @@ export default function FollowupLeadsPage() {
   const { isOnline } = useSync();
 
   const filteredLeads = useMemo(() => {
-    return (allLeads || []).filter((l) =>
+    return (allLeads || []).filter((l: any) =>
       l.fullName.toLowerCase().includes(search.toLowerCase()) ||
       l.location?.toLowerCase().includes(search.toLowerCase())
     );

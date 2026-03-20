@@ -203,7 +203,7 @@ async function initIndexedDB(): Promise<IDBDatabase> {
 /**
  * Get IndexedDB instance (lazy loaded)
  */
-async function getIndexedDB(): Promise<IDBDatabase> {
+export async function getIndexedDB(): Promise<IDBDatabase> {
   if (!db) {
     db = await initIndexedDB();
   }
