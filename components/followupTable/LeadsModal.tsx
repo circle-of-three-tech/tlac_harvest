@@ -43,17 +43,19 @@ const LeadsModal = ({ user, isOpen, onClose }: LeadsModalProps) => {
     setError(null);
 
     try {
-      const res = await fetch(
-        `/api/leads?page=${currentPage}&limit=${pageSize}`
-      );
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(pageSize),
+        assignedToId: user.id,
+      });
+
+      const res = await fetch(`/api/leads?${params}`);
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data.message || 'Failed to fetch leads');
       }
     
-    //   console.log("Fetched leads data:", data);
-
       setLeads(data.leads || []);
       setTotalLeads(data.total || 0);
       setTotalPages(Math.ceil((data.total || 0) / pageSize));

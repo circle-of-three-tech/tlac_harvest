@@ -32,17 +32,24 @@ export async function GET(req: NextRequest) {
     const dateTo = searchParams.get("dateTo");
     const status = searchParams.get("status");
     const soulState = searchParams.get("soulState");
+    const assignedToId = searchParams.get("assignedToId");
+    const addedById = searchParams.get("addedById");
 
     const user = session.user as any;
     const skip = (page - 1) * limit;
 
     const where: any = {};
 
-    if (user.role === "FOLLOWUP") {
+    // Allow explicit filter parameters
+    if (assignedToId) {
+      where.assignedToId = assignedToId;
+    } else if (user.role === "FOLLOWUP") {
       where.assignedToId = user.id;
     }
 
-    if (user.role === "EVANGELIST") {
+    if (addedById) {
+      where.addedById = addedById;
+    } else if (user.role === "EVANGELIST") {
       where.addedById = user.id;
     }
     if (dateFrom || dateTo) {

@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
         where: {
           ...dateFilter,
           soulState: {
-            in: ["NEW_CONVERT", "UNCHURCHED_BELIEVER", "HUNGRY_BELIEVER"],
+            in: ["UNBELIEVER","NEW_CONVERT", "UNCHURCHED_BELIEVER", "HUNGRY_BELIEVER"],
           },
         },
       }),
