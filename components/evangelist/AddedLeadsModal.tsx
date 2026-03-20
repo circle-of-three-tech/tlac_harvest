@@ -43,9 +43,13 @@ const AddedLeadsModal = ({ user, isOpen, onClose }: AddedLeadsModalProps) => {
     setError(null);
 
     try {
-      const res = await fetch(
-        `/api/leads?page=${currentPage}&limit=${pageSize}`
-      );
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(pageSize),
+        addedById: user.id,
+      });
+
+      const res = await fetch(`/api/leads?${params}`);
       const data = await res.json();
 
       if (!res.ok) {
