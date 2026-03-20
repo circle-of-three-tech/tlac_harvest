@@ -5,6 +5,7 @@ const withPWA = withPWAInit({
   register: true, 
     skipWaiting: true,       // ← activate new SW immediately
   clientsClaim: true,      // ← claim all tabs immediately  
+    disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     {
       urlPattern: /^https?.*/,

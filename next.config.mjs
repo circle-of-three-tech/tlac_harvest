@@ -2,8 +2,10 @@ import withPWAInit from 'next-pwa';
 
 const withPWA = withPWAInit({
   dest: 'public',
-  register: true,
-  skipWaiting: false,
+  register: true, 
+   skipWaiting: true,       // ← activate new SW immediately
+  clientsClaim: true,      // ← claim all tabs immediately  
+    disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     // API calls - NetworkFirst with larger cache
     {
