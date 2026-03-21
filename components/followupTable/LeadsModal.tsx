@@ -14,6 +14,8 @@ interface Lead {
   churchMembership: string;
   monthsConsistent: number;
   createdAt: string;
+  notes?: string;
+  additionalNotes?: string;
 }
 
 interface LeadsModalProps {
@@ -29,6 +31,7 @@ const LeadsModal = ({ user, isOpen, onClose }: LeadsModalProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
 
   const pageSize = 10;
 
@@ -174,6 +177,60 @@ const LeadsModal = ({ user, isOpen, onClose }: LeadsModalProps) => {
                       <p className="text-xs text-slate-400 mt-3">
                         Added {format(new Date(lead.createdAt), 'MMM d, yyyy')}
                       </p>
+
+                      {/* Notes Section */}
+                      {(lead.notes || lead.additionalNotes) && (
+                        <div className="mt-4 border-t pt-3">
+                          {lead.notes && (
+                            <div className="mb-3">
+                              <button
+                                onClick={() =>
+                                  setExpandedLeadId(
+                                    expandedLeadId === lead.id ? null : lead.id
+                                  )
+                                }
+                                className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
+                              >
+                                <span>📝 Follow-up Notes</span>
+                                <span className="text-xs">
+                                  {expandedLeadId === lead.id ? '▼' : '▶'}
+                                </span>
+                              </button>
+                              {expandedLeadId === lead.id && (
+                                <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border border-slate-200">
+                                  {lead.notes}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {lead.additionalNotes && (
+                            <div>
+                              <button
+                                onClick={() =>
+                                  setExpandedLeadId(
+                                    expandedLeadId === `${lead.id}-additional`
+                                      ? null
+                                      : `${lead.id}-additional`
+                                  )
+                                }
+                                className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
+                              >
+                                <span>📌 Additional Notes</span>
+                                <span className="text-xs">
+                                  {expandedLeadId === `${lead.id}-additional`
+                                    ? '▼'
+                                    : '▶'}
+                                </span>
+                              </button>
+                              {expandedLeadId === `${lead.id}-additional` && (
+                                <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border border-slate-200">
+                                  {lead.additionalNotes}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
