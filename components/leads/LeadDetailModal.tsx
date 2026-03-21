@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Trash2, Edit2, Send, Check } from "lucide-react";
 import { useSession } from "next-auth/react";
 import {
-  LEAD_STATUS_LABELS, SOUL_STATE_LABELS, AGE_RANGE_LABELS,
+  LEAD_STATUS_LABELS, SOUL_STATE_LABELS, AGE_RANGE_LABELS, GENDER_LABELS,
   CHURCH_LABELS, getAttendanceStatus, cn
 } from "@/lib/utils";
 import { format } from "date-fns";
@@ -179,6 +179,7 @@ export default function LeadDetailModal({
                 {[
                   { label: "Age Range", value: AGE_RANGE_LABELS[lead.ageRange as keyof typeof AGE_RANGE_LABELS] },
                   { label: "Soul State", value: SOUL_STATE_LABELS[lead.soulState as keyof typeof SOUL_STATE_LABELS] },
+                  { label: "Gender", value: GENDER_LABELS[lead.gender as keyof typeof GENDER_LABELS] },
                   { label: "Phone", value: lead.phone || "—" },
                   { label: "Location", value: lead.location },
                   { label: "Address", value: lead.address || "—" },

@@ -46,6 +46,11 @@ export const CHURCH_LABELS: Record<ChurchMembership, string> = {
   OTHERS: "Others",
 };
 
+export const GENDER_LABELS: Record<"MALE" | "FEMALE" , string> = {
+  MALE: "Male",
+  FEMALE: "Female"
+};
+
 export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   NEW_LEAD: "#f97316",
   FOLLOWING_UP: "#3b82f6",
