@@ -236,7 +236,7 @@ export default function AdminDashboardPage() {
                     bg: "bg-purple-50",
                     text: "text-purple-600",
                     border: "border-purple-200",
-                    link: "/dashboard/admin/evangelist",
+                    link: "/dashboard/admin/evangelists",
                   },
                   {
                     label: "Follow-Up",
@@ -245,7 +245,7 @@ export default function AdminDashboardPage() {
                     bg: "bg-blue-50",
                     text: "text-blue-600",
                     border: "border-blue-200",
-                    link: "/dashboard/admin/followup",
+                    link: "/dashboard/admin/followups",
                   },
                 ].map((card, index) => (
                   <Link href={card.link} key={index}>
