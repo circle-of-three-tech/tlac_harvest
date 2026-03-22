@@ -21,6 +21,7 @@ const adminUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
+  role: z.enum(['EVANGELIST', 'FOLLOWUP']),
   gender: z.enum(['MALE', 'FEMALE']).optional().nullable(),
   noOfSoulsTarget: z.number().int().min(0).optional(),
 });
