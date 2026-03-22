@@ -127,8 +127,7 @@ export async function POST(req: NextRequest) {
               url: '/dashboard',
               announcementId: announcement.id,
             },
-          },
-          prisma
+          }, 
         );
       }
     } catch (pushError) {
