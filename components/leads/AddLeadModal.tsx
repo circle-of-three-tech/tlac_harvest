@@ -110,6 +110,7 @@ export default function AddLeadModal({
             <div>
               <label className="harvest-label">Age Range *</label>
               <select
+              required
                 value={form.ageRange}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, ageRange: e.target.value }))
@@ -127,6 +128,7 @@ export default function AddLeadModal({
             <div>
               <label className="harvest-label">Gender *</label>
               <select
+              required
                 value={form.gender}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, gender: e.target.value }))
@@ -145,6 +147,7 @@ export default function AddLeadModal({
             <div className="col-span-2">
               <label className="harvest-label">Phone</label>
               <input
+              required
                 type="tel"
                 value={form.phone}
                 onChange={(e) =>
@@ -158,6 +161,7 @@ export default function AddLeadModal({
             <div>
               <label className="harvest-label">Soul State *</label>
               <select
+              required
                 value={form.soulState}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, soulState: e.target.value }))
