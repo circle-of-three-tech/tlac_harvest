@@ -164,8 +164,59 @@ function getDefaultTemplate(type: SMSType): string {
       `New lead: {leadName} ({phone}) from {location}. Status: {status}`,
     FOLLOWUP_ASSIGNMENT:
       `Hi {assigneeName}, a new lead has been assigned to you: {leadName} from {location}. Phone: {phone}`,
+    SOULSTATE_UNBELIEVER:
+      `Hello {leadName}, we'd love to share the good news of Jesus Christ with you. Welcome!`,
+    SOULSTATE_NEW_CONVERT:
+      `Welcome to the family of Christ, {leadName}! We're here to help you grow in your faith.`,
+    SOULSTATE_UNCHURCHED_BELIEVER:
+      `Hi {leadName}, welcome! We're excited to help you reconnect with your faith community.`,
+    SOULSTATE_HUNGRY_BELIEVER:
+      `Welcome, {leadName}! We're thrilled to journey with you as you grow deeper in Christ.`,
   };
   return defaults[type];
+}
+
+// ─── Soul state welcome SMS ───────────────────────────────────────────────────
+
+/**
+ * Send a soul-state welcome SMS to a lead based on their soul state.
+ * Fires asynchronously after lead creation.
+ */
+export async function sendSoulStateWelcomeSMS(lead: {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  location: string;
+  soulState: string;
+}): Promise<void> {
+  if (!lead.phone) return;
+
+  const smsTypeMap: Record<string, SMSType> = {
+    UNBELIEVER: SMSType.SOULSTATE_UNBELIEVER,
+    NEW_CONVERT: SMSType.SOULSTATE_NEW_CONVERT,
+    UNCHURCHED_BELIEVER: SMSType.SOULSTATE_UNCHURCHED_BELIEVER,
+    HUNGRY_BELIEVER: SMSType.SOULSTATE_HUNGRY_BELIEVER,
+  };
+
+  const smsType = smsTypeMap[lead.soulState];
+  if (!smsType) return; // Soul state not found in mapping
+
+  try {
+    const template = await getSMSTemplate(smsType);
+    const message = renderTemplate(template, {
+      leadName: lead.fullName,
+      location: lead.location,
+    });
+
+    await sendSMS({
+      phone: lead.phone,
+      message,
+      type: smsType,
+      leadId: lead.id,
+    });
+  } catch (err) {
+    console.error(`[Soul State SMS] Failed for lead ${lead.id}:`, err);
+  }
 }
 
 // ─── Batch send ───────────────────────────────────────────────────────────────

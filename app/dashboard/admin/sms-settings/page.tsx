@@ -46,6 +46,22 @@ const TEMPLATE_INFO: Record<
     description: "Sent to followup member when a lead is assigned to them",
     placeholders: ["{assigneeName}", "{leadName}", "{location}", "{phone}"],
   },
+  SOULSTATE_UNBELIEVER: {
+    description: "Sent to new leads with soul state 'Unbeliever' when created",
+    placeholders: ["{leadName}", "{location}"],
+  },
+  SOULSTATE_NEW_CONVERT: {
+    description: "Sent to new leads with soul state 'New Convert' when created",
+    placeholders: ["{leadName}", "{location}"],
+  },
+  SOULSTATE_UNCHURCHED_BELIEVER: {
+    description: "Sent to new leads with soul state 'Unchurched Believer' when created",
+    placeholders: ["{leadName}", "{location}"],
+  },
+  SOULSTATE_HUNGRY_BELIEVER: {
+    description: "Sent to new leads with soul state 'Hungry Believer' when created",
+    placeholders: ["{leadName}", "{location}"],
+  },
 };
 
 const SMSSettingsPage = () => {

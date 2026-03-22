@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { LeadStatus, SMSType } from '@prisma/client';
 import { z } from 'zod';
-import { sendSMS, getSMSTemplate, renderTemplate } from '@/lib/sms';
+import { sendSMS, getSMSTemplate, renderTemplate, sendSoulStateWelcomeSMS } from '@/lib/sms';
 import { sendPushToRole, configureWebPush } from '@/lib/push';
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
@@ -126,6 +126,7 @@ export async function POST(req: NextRequest) {
 
     // Fire side-effects in the background — never delay the response.
     void sendAdminAlerts(lead);
+    void sendSoulStateWelcomeSMS(lead);
 
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {
