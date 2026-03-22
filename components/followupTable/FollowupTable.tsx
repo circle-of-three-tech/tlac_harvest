@@ -10,7 +10,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
     const [followups, setFollowups] = useState(initialFollowups);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingFollowupId, setEditingFollowupId] = useState<string>(null);
+    const [editingFollowupId, setEditingFollowupId] = useState<string>("");
     const [showEditModal, setShowEditModal] = useState(false);
 
 
@@ -159,7 +159,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
         <EditFollowupModal
           isOpen={showEditModal}
           onClose={closeEditModal}
-          followupMember={editingFollowupId}
+          followupMemberId={editingFollowupId}
           onSuccess={handleEditSuccess}
           onDelete={handleDeleteSuccess}
         />

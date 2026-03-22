@@ -27,7 +27,7 @@ export default function EditFollowupModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  followupMemberId: string | null;
+  followupMemberId: string;
   onSuccess: (updatedFollowupMember: FollowupMember) => void;
   onDelete?: (followupMemberId: string) => void;
 }) {
