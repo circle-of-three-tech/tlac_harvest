@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, NotepadText, X, Pin } from 'lucide-react';
 
 interface Lead {
   id: string;
@@ -191,9 +191,9 @@ const AddedLeadsModal = ({ user, isOpen, onClose }: AddedLeadsModalProps) => {
                                 }
                                 className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
                               >
-                                <span>📝 Follow-up Notes</span>
+                                <span><NotepadText /> Follow-up Notes</span>
                                 <span className="text-xs">
-                                  {expandedLeadId === lead.id ? '▼' : '▶'}
+                                  {expandedLeadId === lead.id ? <ChevronDown size={12} />: <ChevronRight size={12} />}
                                 </span>
                               </button>
                               {expandedLeadId === lead.id && (
@@ -215,11 +215,11 @@ const AddedLeadsModal = ({ user, isOpen, onClose }: AddedLeadsModalProps) => {
                                 }
                                 className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
                               >
-                                <span>📌 Additional Notes</span>
+                                <span><Pin /> Additional Notes</span>
                                 <span className="text-xs">
                                   {expandedLeadId === `${lead.id}-additional`
-                                    ? '▼'
-                                    : '▶'}
+                                    ? <ChevronDown size={12} />
+                                    : <ChevronRight size={12} />}
                                 </span>
                               </button>
                               {expandedLeadId === `${lead.id}-additional` && (
