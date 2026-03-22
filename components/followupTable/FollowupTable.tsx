@@ -111,7 +111,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div
                   onClick={() => openLeadsModal(user)}
-                  className="relative flex items-center gap-3 flex-1 cursor-pointer"
+                  className="flex items-center gap-3 flex-1 cursor-pointer"
                 >
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
                     {user.name[0]}
@@ -124,7 +124,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
 
                 <button
                   onClick={(e) => openEditModal(e, user)}
-                  className="absolute top-[1rem] right-[1rem] flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition"
+                  className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition"
                 >
                   <Edit2 className="w-4 h-4 text-blue-700" />
                 </button>
