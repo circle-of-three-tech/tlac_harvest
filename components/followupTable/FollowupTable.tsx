@@ -44,6 +44,8 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
       setFollowups(followups.filter(f => f.id !== deletedId));
     };
 
+    const truncate = (str, max) => str.length > max ? str.slice(0, max) + "..." : str;
+ 
     return (
       <>
         {/* Desktop Table View */}
@@ -109,19 +111,20 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div
                   onClick={() => openLeadsModal(user)}
-                  className="flex items-center gap-3 flex-1 cursor-pointer"
+                  className="relative flex items-center gap-3 flex-1 cursor-pointer"
                 >
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
                     {user.name[0]}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</div>
+                    <div className="font-semibold text-slate-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{truncate(user.name, 10)}</div>
                     <div className="text-xs text-slate-400 truncate">{user.email}</div>
                   </div>
                 </div>
+
                 <button
                   onClick={(e) => openEditModal(e, user)}
-                  className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition"
+                  className="absolute top-[1rem] right-[1rem] flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition"
                 >
                   <Edit2 className="w-4 h-4 text-blue-700" />
                 </button>

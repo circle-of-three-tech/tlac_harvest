@@ -43,7 +43,10 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
     // Remove the evangelist from the list
     setEvangelists(evangelists.filter(e => e.id !== deletedId));
   };
-// console.log({ evangelists });
+
+   const truncate = (str, max) => str.length > max ? str.slice(0, max) + "..." : str;
+ 
+   
   return (
     <>
       {/* Desktop Table View */}
@@ -117,7 +120,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
                   {user.name[0]}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-semibold text-earth-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</div>
+                  <div className="font-semibold text-earth-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{truncate(user.name, 10)}</div>
                   <div className="text-xs text-slate-400 truncate">{user.email}</div>
                 </div>
               </div>
