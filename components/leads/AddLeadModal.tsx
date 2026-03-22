@@ -15,6 +15,7 @@ const AGE_RANGES = [
 ];
 
 const GENDER = [
+  { value: "", label: "Gender"},
   { value: "MALE", label: "Male"},
   { value: "FEMALE", label: "Female"}
 ];

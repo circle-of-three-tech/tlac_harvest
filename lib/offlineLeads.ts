@@ -1,12 +1,17 @@
 /**
  * Offline Lead Storage Service
- * Handles persistent storage of offline leads and cached data using IndexedDB
+ * Handles persistent storage of offline leads and cached data using IndexedDB.
+ *
+ * Key fixes vs. previous version:
+ * - cache*() functions no longer mutate their input arguments
+ * - _id is derived safely without modifying the original object
+ * - Fallback IDs use crypto.randomUUID() instead of Math.random()
  */
 
-// ==================== INTERFACES ====================
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface OfflineLead {
-  id: string; // Client-generated UUID
+  id: string;
   fullName: string;
   ageRange: string;
   phone?: string;
@@ -14,10 +19,10 @@ export interface OfflineLead {
   location: string;
   additionalNotes?: string;
   soulState: string;
+  gender?: string;
   createdAt: string; // ISO string
   syncStatus: 'pending' | 'syncing' | 'synced' | 'failed';
   syncError?: string;
-  gender?: string;
 }
 
 export interface CachedLead {
@@ -33,7 +38,7 @@ export interface CachedLead {
   createdByName?: string;
   assignedTo?: string;
   status?: string;
-  cachedAt: number; // timestamp
+  cachedAt: number;
 }
 
 export interface CachedUser {
@@ -89,13 +94,12 @@ export interface CachedNote {
   syncStatus: 'pending' | 'synced' | 'failed';
 }
 
-// ==================== CONSTANTS ====================
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DB_NAME = 'harvest_offline_db';
-const DB_VERSION = 2; // Increment when schema changes
+const DB_VERSION = 2;
 
-// Store names
-const STORE_NAMES = {
+const STORE = {
   OFFLINE_LEADS: 'offline_leads',
   CACHED_LEADS: 'cached_leads',
   CACHED_USERS: 'cached_users',
@@ -107,12 +111,11 @@ const STORE_NAMES = {
   QUEUED_OPERATIONS: 'queued_operations',
 } as const;
 
+// ─── DB singleton ─────────────────────────────────────────────────────────────
+
 let db: IDBDatabase | null = null;
 
-/**
- * Initialize IndexedDB for offline storage
- */
-async function initIndexedDB(): Promise<IDBDatabase> {
+function initIndexedDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -122,720 +125,370 @@ async function initIndexedDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const database = (event.target as IDBOpenDBRequest).result;
 
-      // Offline leads store (for local lead creation)
-      if (!database.objectStoreNames.contains(STORE_NAMES.OFFLINE_LEADS)) {
-        const offlineStore = database.createObjectStore(STORE_NAMES.OFFLINE_LEADS, {
-          keyPath: 'id',
-        });
-        offlineStore.createIndex('syncStatus', 'syncStatus', { unique: false });
-        offlineStore.createIndex('createdAt', 'createdAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.OFFLINE_LEADS)) {
+        const s = database.createObjectStore(STORE.OFFLINE_LEADS, { keyPath: 'id' });
+        s.createIndex('syncStatus', 'syncStatus', { unique: false });
+        s.createIndex('createdAt', 'createdAt', { unique: false });
       }
 
-      // Cached leads (from API)
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_LEADS)) {
-        const cachedLeadsStore = database.createObjectStore(STORE_NAMES.CACHED_LEADS, {
-          keyPath: '_id',
-        });
-        cachedLeadsStore.createIndex('cachedAt', 'cachedAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.CACHED_LEADS)) {
+        const s = database.createObjectStore(STORE.CACHED_LEADS, { keyPath: '_id' });
+        s.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
 
-      // Cached users
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_USERS)) {
-        const usersStore = database.createObjectStore(STORE_NAMES.CACHED_USERS, {
-          keyPath: '_id',
-        });
-        usersStore.createIndex('role', 'role', { unique: false });
-        usersStore.createIndex('cachedAt', 'cachedAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.CACHED_USERS)) {
+        const s = database.createObjectStore(STORE.CACHED_USERS, { keyPath: '_id' });
+        s.createIndex('role', 'role', { unique: false });
+        s.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
 
-      // Cached announcements
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_ANNOUNCEMENTS)) {
-        const announcementsStore = database.createObjectStore(STORE_NAMES.CACHED_ANNOUNCEMENTS, {
-          keyPath: '_id',
-        });
-        announcementsStore.createIndex('cachedAt', 'cachedAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.CACHED_ANNOUNCEMENTS)) {
+        const s = database.createObjectStore(STORE.CACHED_ANNOUNCEMENTS, { keyPath: '_id' });
+        s.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
 
-      // Cached stats
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_STATS)) {
-        database.createObjectStore(STORE_NAMES.CACHED_STATS, { keyPath: 'statsId' });
+      if (!database.objectStoreNames.contains(STORE.CACHED_STATS)) {
+        database.createObjectStore(STORE.CACHED_STATS, { keyPath: 'statsId' });
       }
 
-      // Cached activity logs
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_ACTIVITY_LOGS)) {
-        const logsStore = database.createObjectStore(STORE_NAMES.CACHED_ACTIVITY_LOGS, {
-          keyPath: '_id',
-        });
-        logsStore.createIndex('cachedAt', 'cachedAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.CACHED_ACTIVITY_LOGS)) {
+        const s = database.createObjectStore(STORE.CACHED_ACTIVITY_LOGS, { keyPath: '_id' });
+        s.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
 
-      // Cached SMS logs
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_SMS_LOGS)) {
-        const smsStore = database.createObjectStore(STORE_NAMES.CACHED_SMS_LOGS, {
-          keyPath: '_id',
-        });
-        smsStore.createIndex('cachedAt', 'cachedAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.CACHED_SMS_LOGS)) {
+        const s = database.createObjectStore(STORE.CACHED_SMS_LOGS, { keyPath: '_id' });
+        s.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
 
-      // Cached notes
-      if (!database.objectStoreNames.contains(STORE_NAMES.CACHED_NOTES)) {
-        const notesStore = database.createObjectStore(STORE_NAMES.CACHED_NOTES, {
-          keyPath: '_id',
-        });
-        notesStore.createIndex('leadId', 'leadId', { unique: false });
-        notesStore.createIndex('syncStatus', 'syncStatus', { unique: false });
+      if (!database.objectStoreNames.contains(STORE.CACHED_NOTES)) {
+        const s = database.createObjectStore(STORE.CACHED_NOTES, { keyPath: '_id' });
+        s.createIndex('leadId', 'leadId', { unique: false });
+        s.createIndex('syncStatus', 'syncStatus', { unique: false });
       }
 
-      // Queued operations
-      if (!database.objectStoreNames.contains(STORE_NAMES.QUEUED_OPERATIONS)) {
-        const opsStore = database.createObjectStore(STORE_NAMES.QUEUED_OPERATIONS, {
+      if (!database.objectStoreNames.contains(STORE.QUEUED_OPERATIONS)) {
+        const s = database.createObjectStore(STORE.QUEUED_OPERATIONS, {
           keyPath: 'id',
           autoIncrement: true,
         });
-        opsStore.createIndex('status', 'status', { unique: false });
-        opsStore.createIndex('resourceId', 'resourceId', { unique: false });
-        opsStore.createIndex('createdAt', 'createdAt', { unique: false });
+        s.createIndex('status', 'status', { unique: false });
+        s.createIndex('resourceId', 'resourceId', { unique: false });
+        s.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
   });
 }
 
-/**
- * Get IndexedDB instance (lazy loaded)
- */
 export async function getIndexedDB(): Promise<IDBDatabase> {
-  if (!db) {
-    db = await initIndexedDB();
-  }
+  if (!db) db = await initIndexedDB();
   return db;
 }
 
+// ─── Generic IDB helpers ──────────────────────────────────────────────────────
 
+function idbGet<T>(db: IDBDatabase, store: string, key: IDBValidKey): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGetAll<T>(db: IDBDatabase, store: string): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result as T[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGetAllByIndex<T>(
+  db: IDBDatabase,
+  store: string,
+  indexName: string,
+  key: IDBValidKey
+): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).index(indexName).getAll(key);
+    req.onsuccess = () => resolve(req.result as T[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbAdd(db: IDBDatabase, store: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).add(value);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbDelete(db: IDBDatabase, store: string, key: IDBValidKey): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
 
 /**
- * Save a lead to offline storage
+ * Clear a store then bulk-insert records in one transaction.
+ * Does NOT mutate the input array.
  */
+function idbReplaceAll(db: IDBDatabase, store: string, records: unknown[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const objectStore = tx.objectStore(store);
+
+    objectStore.clear();
+    for (const record of records) {
+      objectStore.add(record);
+    }
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ─── Offline leads ────────────────────────────────────────────────────────────
+
 export async function saveOfflineLead(lead: OfflineLead): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.OFFLINE_LEADS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.OFFLINE_LEADS);
-      const request = store.add(lead);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error saving offline lead:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  return idbAdd(database, STORE.OFFLINE_LEADS, lead);
 }
 
-/**
- * Get all offline leads
- */
 export async function getOfflineLeads(): Promise<OfflineLead[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.OFFLINE_LEADS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.OFFLINE_LEADS);
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting offline leads:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAll<OfflineLead>(database, STORE.OFFLINE_LEADS);
 }
 
-/**
- * Get pending leads that need to be synced
- */
 export async function getPendingLeads(): Promise<OfflineLead[]> {
   const leads = await getOfflineLeads();
-  return leads.filter((lead) => lead.syncStatus === 'pending' || lead.syncStatus === 'failed');
+  return leads.filter((l) => l.syncStatus === 'pending' || l.syncStatus === 'failed');
 }
 
-/**
- * Update lead sync status
- */
 export async function updateLeadSyncStatus(
   leadId: string,
-  status: 'pending' | 'syncing' | 'synced' | 'failed',
+  status: OfflineLead['syncStatus'],
   error?: string
 ): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.OFFLINE_LEADS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.OFFLINE_LEADS);
-      const getRequest = store.get(leadId);
+  const database = await getIndexedDB();
+  const lead = await idbGet<OfflineLead>(database, STORE.OFFLINE_LEADS, leadId);
+  if (!lead) throw new Error(`Offline lead not found: ${leadId}`);
 
-      getRequest.onsuccess = () => {
-        const lead = getRequest.result;
-        if (lead) {
-          lead.syncStatus = status;
-          if (error) lead.syncError = error;
-          const updateRequest = store.put(lead);
-          updateRequest.onerror = () => reject(updateRequest.error);
-          updateRequest.onsuccess = () => resolve();
-        } else {
-          reject(new Error('Lead not found'));
-        }
-      };
+  const updated: OfflineLead = { ...lead, syncStatus: status };
+  if (error !== undefined) updated.syncError = error;
 
-      getRequest.onerror = () => reject(getRequest.error);
-    });
-  } catch (error) {
-    console.error('Error updating lead sync status:', error);
-    throw error;
-  }
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE.OFFLINE_LEADS, 'readwrite');
+    const req = tx.objectStore(STORE.OFFLINE_LEADS).put(updated);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Delete offline lead (after successful sync)
- */
 export async function deleteOfflineLead(leadId: string): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.OFFLINE_LEADS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.OFFLINE_LEADS);
-      const request = store.delete(leadId);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error deleting offline lead:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  return idbDelete(database, STORE.OFFLINE_LEADS, leadId);
 }
 
-/**
- * Clear all offline leads
- */
 export async function clearOfflineLeads(): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.OFFLINE_LEADS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.OFFLINE_LEADS);
-      const request = store.clear();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error clearing offline leads:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE.OFFLINE_LEADS, 'readwrite');
+    const req = tx.objectStore(STORE.OFFLINE_LEADS).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
-// ==================== CACHE FUNCTIONS ====================
+// ─── Cache helpers ────────────────────────────────────────────────────────────
 
-/**
- * Cache leads from API
- */
-export async function cacheLeads(leads: CachedLead[]): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const now = Date.now();
-    const leadsWithTimestamp = leads.map((lead: any) => {
-      // Ensure _id exists for keyPath (fallback to id if needed)
-      if (!lead._id && lead.id) {
-        lead._id = lead.id;
-      }
-      if (!lead._id) {
-        console.warn('Lead missing _id:', lead);
-        lead._id = `lead_${Date.now()}_${Math.random()}`;
-      }
-      return {
-        ...lead,
-        cachedAt: now,
-      };
-    });
-
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_LEADS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_LEADS);
-
-      // Clear old cache first
-      store.clear();
-
-      leadsWithTimestamp.forEach((lead) => {
-        try {
-          store.add(lead);
-        } catch (itemError) {
-          console.error('Error adding lead to cache:', lead, itemError);
-        }
-      });
-
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error caching leads:', error);
-    throw error;
-  }
+/** Derive a safe _id from an API record without mutating the original. */
+function resolveId(record: Record<string, unknown>, fallbackPrefix: string): string {
+  const id = (record.id ?? record._id) as string | undefined;
+  if (id) return id;
+  console.warn(`[offlineLeads] Record missing id:`, record);
+  return `${fallbackPrefix}_${crypto.randomUUID()}`;
 }
 
-/**
- * Get cached leads
- */
+// ─── Cached leads ─────────────────────────────────────────────────────────────
+
+export async function cacheLeads(leads: Omit<CachedLead, 'cachedAt'>[]): Promise<void> {
+  const database = await getIndexedDB();
+  const now = Date.now();
+  const records: CachedLead[] = leads.map((lead) => ({
+    ...lead,
+    _id: resolveId(lead as unknown as Record<string, unknown>, 'lead'),
+    cachedAt: now,
+  }));
+  return idbReplaceAll(database, STORE.CACHED_LEADS, records);
+}
+
 export async function getCachedLeads(): Promise<CachedLead[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_LEADS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_LEADS);
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting cached leads:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAll<CachedLead>(database, STORE.CACHED_LEADS);
 }
 
-/**
- * Cache users
- */
-export async function cacheUsers(users: CachedUser[]): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const now = Date.now();
-    const usersWithTimestamp = users.map((user: any) => {
-      // Ensure _id exists for keyPath
-      if (!user._id && user.id) {
-        user._id = user.id;
-      }
-      if (!user._id) {
-        console.warn('User missing _id:', user);
-        user._id = `user_${Date.now()}_${Math.random()}`;
-      }
-      return {
-        ...user,
-        cachedAt: now,
-      };
-    });
+// ─── Cached users ─────────────────────────────────────────────────────────────
 
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_USERS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_USERS);
-
-      store.clear();
-
-      usersWithTimestamp.forEach((user) => {
-        try {
-          store.add(user);
-        } catch (itemError) {
-          console.error('Error adding user to cache:', user, itemError);
-        }
-      });
-
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error caching users:', error);
-    throw error;
-  }
+export async function cacheUsers(users: Omit<CachedUser, 'cachedAt'>[]): Promise<void> {
+  const database = await getIndexedDB();
+  const now = Date.now();
+  const records: CachedUser[] = users.map((user) => ({
+    ...user,
+    _id: resolveId(user as unknown as Record<string, unknown>, 'user'),
+    cachedAt: now,
+  }));
+  return idbReplaceAll(database, STORE.CACHED_USERS, records);
 }
 
-/**
- * Get cached users
- */
 export async function getCachedUsers(): Promise<CachedUser[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_USERS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_USERS);
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting cached users:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAll<CachedUser>(database, STORE.CACHED_USERS);
 }
 
-/**
- * Cache announcements
- */
-export async function cacheAnnouncements(announcements: CachedAnnouncement[]): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const now = Date.now();
-    const announcementsWithTimestamp = announcements.map((ann: any) => {
-      if (!ann._id && ann.id) {
-        ann._id = ann.id;
-      }
-      if (!ann._id) {
-        ann._id = `announcement_${Date.now()}_${Math.random()}`;
-      }
-      return {
-        ...ann,
-        cachedAt: now,
-      };
-    });
+// ─── Cached announcements ─────────────────────────────────────────────────────
 
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction(
-        [STORE_NAMES.CACHED_ANNOUNCEMENTS],
-        'readwrite'
-      );
-      const store = transaction.objectStore(STORE_NAMES.CACHED_ANNOUNCEMENTS);
-
-      store.clear();
-
-      announcementsWithTimestamp.forEach((ann) => {
-        try {
-          store.add(ann);
-        } catch (itemError) {
-          console.error('Error adding announcement to cache:', ann, itemError);
-        }
-      });
-
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error caching announcements:', error);
-    throw error;
-  }
+export async function cacheAnnouncements(
+  announcements: Omit<CachedAnnouncement, 'cachedAt'>[]
+): Promise<void> {
+  const database = await getIndexedDB();
+  const now = Date.now();
+  const records: CachedAnnouncement[] = announcements.map((ann) => ({
+    ...ann,
+    _id: resolveId(ann as unknown as Record<string, unknown>, 'announcement'),
+    cachedAt: now,
+  }));
+  return idbReplaceAll(database, STORE.CACHED_ANNOUNCEMENTS, records);
 }
 
-/**
- * Get cached announcements
- */
 export async function getCachedAnnouncements(): Promise<CachedAnnouncement[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_ANNOUNCEMENTS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_ANNOUNCEMENTS);
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting cached announcements:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAll<CachedAnnouncement>(database, STORE.CACHED_ANNOUNCEMENTS);
 }
 
-/**
- * Cache stats
- */
-export async function cacheStats(stats: CachedStats): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const statsWithTimestamp = {
-      statsId: 'main',
-      ...stats,
-      cachedAt: Date.now(),
-    };
+// ─── Cached stats ─────────────────────────────────────────────────────────────
 
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_STATS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_STATS);
-      const request = store.put(statsWithTimestamp);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error caching stats:', error);
-    throw error;
-  }
+export async function cacheStats(stats: Omit<CachedStats, 'cachedAt'>): Promise<void> {
+  const database = await getIndexedDB();
+  const record = { statsId: 'main', ...stats, cachedAt: Date.now() };
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE.CACHED_STATS, 'readwrite');
+    const req = tx.objectStore(STORE.CACHED_STATS).put(record);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Get cached stats
- */
 export async function getCachedStats(): Promise<CachedStats | null> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_STATS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_STATS);
-      const request = store.get('main');
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result || null);
-    });
-  } catch (error) {
-    console.error('Error getting cached stats:', error);
-    return null;
-  }
+  const database = await getIndexedDB();
+  const result = await idbGet<CachedStats & { statsId: string }>(
+    database,
+    STORE.CACHED_STATS,
+    'main'
+  );
+  return result ?? null;
 }
 
-/**
- * Cache activity logs
- */
-export async function cacheActivityLogs(logs: CachedActivityLog[]): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const now = Date.now();
-    const logsWithTimestamp = logs.map((log) => ({
-      ...log,
-      cachedAt: now,
-    }));
+// ─── Cached activity logs ─────────────────────────────────────────────────────
 
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_ACTIVITY_LOGS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_ACTIVITY_LOGS);
-
-      store.clear();
-
-      logsWithTimestamp.forEach((log) => {
-        store.add(log);
-      });
-
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error caching activity logs:', error);
-    throw error;
-  }
+export async function cacheActivityLogs(
+  logs: Omit<CachedActivityLog, 'cachedAt'>[]
+): Promise<void> {
+  const database = await getIndexedDB();
+  const now = Date.now();
+  const records = logs.map((log) => ({ ...log, cachedAt: now }));
+  return idbReplaceAll(database, STORE.CACHED_ACTIVITY_LOGS, records);
 }
 
-/**
- * Get cached activity logs
- */
 export async function getCachedActivityLogs(): Promise<CachedActivityLog[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_ACTIVITY_LOGS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_ACTIVITY_LOGS);
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting cached activity logs:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAll<CachedActivityLog>(database, STORE.CACHED_ACTIVITY_LOGS);
 }
 
-/**
- * Cache SMS logs
- */
-export async function cacheSMSLogs(logs: CachedSMSLog[]): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const now = Date.now();
-    const logsWithTimestamp = logs.map((log) => ({
-      ...log,
-      cachedAt: now,
-    }));
+// ─── Cached SMS logs ──────────────────────────────────────────────────────────
 
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_SMS_LOGS], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_SMS_LOGS);
-
-      store.clear();
-
-      logsWithTimestamp.forEach((log) => {
-        store.add(log);
-      });
-
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error caching SMS logs:', error);
-    throw error;
-  }
+export async function cacheSMSLogs(logs: Omit<CachedSMSLog, 'cachedAt'>[]): Promise<void> {
+  const database = await getIndexedDB();
+  const now = Date.now();
+  const records = logs.map((log) => ({ ...log, cachedAt: now }));
+  return idbReplaceAll(database, STORE.CACHED_SMS_LOGS, records);
 }
 
-/**
- * Get cached SMS logs
- */
 export async function getCachedSMSLogs(): Promise<CachedSMSLog[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_SMS_LOGS], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_SMS_LOGS);
-      const request = store.getAll();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting cached SMS logs:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAll<CachedSMSLog>(database, STORE.CACHED_SMS_LOGS);
 }
 
-/**
- * Save cached note for offline creation
- */
+// ─── Cached notes ─────────────────────────────────────────────────────────────
+
 export async function saveCachedNote(note: CachedNote): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_NOTES], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_NOTES);
-      const request = store.add(note);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error saving cached note:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  return idbAdd(database, STORE.CACHED_NOTES, note);
 }
 
-/**
- * Get all cached notes for a lead
- */
 export async function getCachedNotesForLead(leadId: string): Promise<CachedNote[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_NOTES], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_NOTES);
-      const index = store.index('leadId');
-      const request = index.getAll(leadId);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting cached notes:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAllByIndex<CachedNote>(database, STORE.CACHED_NOTES, 'leadId', leadId);
 }
 
-/**
- * Get all pending notes (not yet synced)
- */
 export async function getPendingNotes(): Promise<CachedNote[]> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_NOTES], 'readonly');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_NOTES);
-      const index = store.index('syncStatus');
-      const request = index.getAll('pending');
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting pending notes:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return idbGetAllByIndex<CachedNote>(database, STORE.CACHED_NOTES, 'syncStatus', 'pending');
 }
 
-/**
- * Update note sync status
- */
 export async function updateNoteSyncStatus(
   noteId: string,
-  status: 'pending' | 'synced' | 'failed'
+  status: CachedNote['syncStatus']
 ): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_NOTES], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_NOTES);
-      const getRequest = store.get(noteId);
+  const database = await getIndexedDB();
+  const note = await idbGet<CachedNote>(database, STORE.CACHED_NOTES, noteId);
+  if (!note) throw new Error(`Cached note not found: ${noteId}`);
 
-      getRequest.onsuccess = () => {
-        const note = getRequest.result;
-        if (note) {
-          note.syncStatus = status;
-          const updateRequest = store.put(note);
-          updateRequest.onerror = () => reject(updateRequest.error);
-          updateRequest.onsuccess = () => resolve();
-        } else {
-          reject(new Error('Note not found'));
-        }
-      };
-
-      getRequest.onerror = () => reject(getRequest.error);
-    });
-  } catch (error) {
-    console.error('Error updating note sync status:', error);
-    throw error;
-  }
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE.CACHED_NOTES, 'readwrite');
+    const req = tx.objectStore(STORE.CACHED_NOTES).put({ ...note, syncStatus: status });
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Delete cached note (after successful sync)
- */
 export async function deleteCachedNote(noteId: string): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAMES.CACHED_NOTES], 'readwrite');
-      const store = transaction.objectStore(STORE_NAMES.CACHED_NOTES);
-      const request = store.delete(noteId);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error deleting cached note:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  return idbDelete(database, STORE.CACHED_NOTES, noteId);
 }
 
-/**
- * Clear all cached data (used on logout)
- */
+// ─── Full clear ───────────────────────────────────────────────────────────────
+
 export async function clearAllCachedData(): Promise<void> {
-  try {
-    const database = await getIndexedDB();
-    const storeNames = Object.values(STORE_NAMES);
-
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction(storeNames, 'readwrite');
-
-      storeNames.forEach((storeName) => {
-        const store = transaction.objectStore(storeName);
-        store.clear();
-      });
-
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error clearing all cached data:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  const storeNames = Object.values(STORE);
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(storeNames, 'readwrite');
+    for (const name of storeNames) {
+      tx.objectStore(name).clear();
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }
 
-// ==================== TRANSFORMATION HELPERS ====================
+// ─── Transform helpers ────────────────────────────────────────────────────────
 
-/**
- * Transform cached lead to component Lead interface
- */
-export function transformCachedLeadToLead(cachedLead: CachedLead): any {
+export function transformCachedLeadToLead(cachedLead: CachedLead): Record<string, unknown> {
   return {
     id: cachedLead._id,
     fullName: cachedLead.fullName,
     location: cachedLead.location,
-    soulState: cachedLead.soulState || 'UNBELIEVER',
-    status: cachedLead.status || 'NEW_LEAD',
+    soulState: cachedLead.soulState ?? 'UNBELIEVER',
+    status: cachedLead.status ?? 'NEW_LEAD',
     ageRange: cachedLead.ageRange,
     phone: cachedLead.phone,
     address: cachedLead.address,
@@ -843,6 +496,6 @@ export function transformCachedLeadToLead(cachedLead: CachedLead): any {
     gender: cachedLead.gender,
     createdByName: cachedLead.createdByName,
     assignedTo: cachedLead.assignedTo,
-    createdAt: new Date().toISOString(), // Use cached timestamp
+    createdAt: new Date(cachedLead.cachedAt).toISOString(),
   };
 }

@@ -1,8 +1,13 @@
 'use client';
 
 /**
- * Operations hook for mutation handling
- * Allows queuing and managing offline mutations
+ * useOfflineOperation
+ * Mutation handling with online-first execution and offline queue fallback.
+ *
+ * Fallback policy (mirrors useOfflineLeadCreation):
+ * - Network errors → queue the operation for sync later.
+ * - API errors (4xx / 5xx) → return the error to the caller immediately.
+ *   This prevents invalid / rejected operations from polluting the queue.
  */
 
 import { useCallback, useState } from 'react';
@@ -16,48 +21,74 @@ import {
   type OperationType,
 } from '@/lib/operationQueue';
 
-/**
- * Hook for managing operations (mutations) with offline support
- */
+// ─── Network-error discrimination ─────────────────────────────────────────────
+
+function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface MutationResult {
+  success: boolean;
+  /** Present when the operation was queued (offline or after network failure). */
+  operationId?: number;
+  error?: string;
+}
+
+// ─── Core hook ────────────────────────────────────────────────────────────────
+
 export function useOfflineOperation() {
   const { isOnline } = useSync();
   const [operationError, setOperationError] = useState<Error | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   /**
-   * Queue a mutation operation
-   * If online, tries to execute immediately; if offline, queues for later
+   * Execute a mutation online if possible, otherwise queue for later sync.
+   *
+   * @param executeOnline - Async function that performs the actual fetch.
+   *   Omitting it forces the operation directly into the queue.
    */
   const queueMutation = useCallback(
     async (
       type: OperationType,
       resourceId: string,
       resourceType: 'lead' | 'note',
-      payload: Record<string, any>,
+      payload: Record<string, unknown>,
       executeOnline?: () => Promise<Response>
-    ): Promise<{ success: boolean; operationId?: number; error?: string }> => {
+    ): Promise<MutationResult> => {
       setIsProcessing(true);
       setOperationError(null);
 
       try {
+        // ── Online path ──────────────────────────────────────────────────────
         if (isOnline && executeOnline) {
-          // Try to execute online immediately
           try {
             const response = await executeOnline();
+
             if (response.ok) {
-              setIsProcessing(false);
               return { success: true };
-            } else {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(errorData.error || `HTTP ${response.status}`);
             }
-          } catch (error) {
-            // Fall through to offline queueing
-            console.warn('Online execution failed, queuing for later:', error);
+
+            // Server returned an API error — surface it, do NOT queue.
+            const errorBody = await response.json().catch(() => ({}));
+            const message =
+              errorBody.error ??
+              errorBody.message ??
+              `Request failed (HTTP ${response.status})`;
+            throw new Error(message);
+          } catch (err) {
+            // Only fall through to the queue for network-level failures.
+            if (!isNetworkError(err)) {
+              const error = err instanceof Error ? err : new Error(String(err));
+              setOperationError(error);
+              return { success: false, error: error.message };
+            }
+            console.warn('[useOfflineOperation] Network error, queuing operation:', err);
           }
         }
 
-        // Queue for offline sync
+        // ── Offline (or network-error fallback) path ─────────────────────────
         const operationId = await queueOperation({
           type,
           resourceId,
@@ -69,68 +100,56 @@ export function useOfflineOperation() {
           retryCount: 0,
         });
 
-        setIsProcessing(false);
         return {
           success: true,
           operationId,
-          error: isOnline ? 'Queued for sync' : 'Offline - queued for sync',
+          error: isOnline ? 'Queued after network error — will retry' : 'Offline — queued for sync',
         };
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error('Unknown error');
-        setOperationError(err);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Unknown error');
+        setOperationError(error);
+        return { success: false, error: error.message };
+      } finally {
         setIsProcessing(false);
-        return { success: false, error: err.message };
       }
     },
     [isOnline]
   );
 
-  /**
-   * Get all operations for a resource
-   */
+  /** Retrieve all queued operations for a given resource ID. */
   const getResourceOperations = useCallback(
     async (resourceId: string): Promise<QueuedOperation[]> => {
       try {
         return await getOperationsForResource(resourceId);
-      } catch (error) {
-        console.error('Error getting resource operations:', error);
+      } catch (err) {
+        console.error('[useOfflineOperation] getResourceOperations failed:', err);
         return [];
       }
     },
     []
   );
 
-  /**
-   * Retry a failed operation
-   */
-  const retryOperation = useCallback(
-    async (operationId: number): Promise<boolean> => {
-      try {
-        await updateOperationStatus(operationId, 'pending');
-        return true;
-      } catch (error) {
-        console.error('Error retrying operation:', error);
-        return false;
-      }
-    },
-    []
-  );
+  /** Reset a failed operation to pending so it will be retried. */
+  const retryOperation = useCallback(async (operationId: number): Promise<boolean> => {
+    try {
+      await updateOperationStatus(operationId, 'pending');
+      return true;
+    } catch (err) {
+      console.error('[useOfflineOperation] retryOperation failed:', err);
+      return false;
+    }
+  }, []);
 
-  /**
-   * Discard an operation
-   */
-  const discardOperation = useCallback(
-    async (operationId: number): Promise<boolean> => {
-      try {
-        await deleteOperation(operationId);
-        return true;
-      } catch (error) {
-        console.error('Error discarding operation:', error);
-        return false;
-      }
-    },
-    []
-  );
+  /** Permanently remove an operation from the queue. */
+  const discardOperation = useCallback(async (operationId: number): Promise<boolean> => {
+    try {
+      await deleteOperation(operationId);
+      return true;
+    } catch (err) {
+      console.error('[useOfflineOperation] discardOperation failed:', err);
+      return false;
+    }
+  }, []);
 
   return {
     queueMutation,
@@ -142,58 +161,34 @@ export function useOfflineOperation() {
   };
 }
 
-/**
- * Hook for lead mutations (update, delete, reassign)
- */
+// ─── Lead mutations ───────────────────────────────────────────────────────────
+
 export function useLeadMutation() {
   const { queueMutation } = useOfflineOperation();
 
-  /**
-   * Update a lead
-   */
   const updateLead = useCallback(
-    async (leadId: string, updates: Record<string, any>) => {
-      return queueMutation(
-        'update',
-        leadId,
-        'lead',
-        updates,
-        () =>
-          fetch(`/api/leads/${leadId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates),
-          })
-      );
-    },
+    (leadId: string, updates: Record<string, unknown>) =>
+      queueMutation('update', leadId, 'lead', updates, () =>
+        fetch(`/api/leads/${leadId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        })
+      ),
     [queueMutation]
   );
 
-  /**
-   * Delete a lead
-   */
   const deleteLead = useCallback(
-    async (leadId: string) => {
-      return queueMutation(
-        'delete',
-        leadId,
-        'lead',
-        { leadId },
-        () =>
-          fetch(`/api/leads/${leadId}`, {
-            method: 'DELETE',
-          })
-      );
-    },
+    (leadId: string) =>
+      queueMutation('delete', leadId, 'lead', { leadId }, () =>
+        fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+      ),
     [queueMutation]
   );
 
-  /**
-   * Reassign a lead
-   */
   const reassignLead = useCallback(
-    async (leadId: string, userId: string) => {
-      return queueMutation(
+    (leadId: string, userId: string) =>
+      queueMutation(
         'reassign',
         leadId,
         'lead',
@@ -204,31 +199,21 @@ export function useLeadMutation() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignedTo: userId }),
           })
-      );
-    },
+      ),
     [queueMutation]
   );
 
-  return {
-    updateLead,
-    deleteLead,
-    reassignLead,
-  };
+  return { updateLead, deleteLead, reassignLead };
 }
 
-/**
- * Hook for adding notes to leads
- */
+// ─── Note mutations ───────────────────────────────────────────────────────────
+
 export function useLeadNote() {
   const { queueMutation } = useOfflineOperation();
 
-  /**
-   * Add a note to a lead
-   */
   const addNote = useCallback(
-    async (leadId: string, content: string) => {
-      const noteId = `note_${Date.now()}`;
-
+    (leadId: string, content: string) => {
+      const noteId = crypto.randomUUID();
       return queueMutation(
         'addNote',
         noteId,

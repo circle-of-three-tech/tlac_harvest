@@ -1,174 +1,233 @@
 // app/api/leads/[id]/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { LeadStatus, SMSType } from "@prisma/client";
-import { sendSMS, getSMSTemplate, renderTemplate } from "@/lib/sms";
-import { logFieldChange, logStatusChange, logAssignment } from "@/lib/audit";
-import { sendPushToUser, configureWebPush } from "@/lib/push";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { LeadStatus, SMSType, ChurchMembership } from '@prisma/client';
+import { z } from 'zod';
+import { sendSMS, getSMSTemplate, renderTemplate } from '@/lib/sms';
+import { logFieldChange, logStatusChange, logAssignment } from '@/lib/audit';
+import { sendPushToUser, configureWebPush } from '@/lib/push';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// ─── Validation schemas ───────────────────────────────────────────────────────
 
-  const user = session.user as any;
-  const lead = await prisma.lead.findUnique({
-    where: { id: params.id },
-    include: {
-      addedBy: { select: { id: true, name: true, phone: true, email: true } },
-      assignedTo: { select: { id: true, name: true, phone: true, email: true } },
-      notes: {
-        include: { user: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "asc" },
+/** Fields any non-FOLLOWUP user can update. */
+const adminUpdateSchema = z.object({
+  fullName: z.string().min(1).optional(),
+  ageRange: z.enum(['UNDER_18', 'AGE_18_25', 'AGE_26_35', 'AGE_36_45', 'AGE_46_60', 'ABOVE_60']).optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  location: z.string().min(1).optional(),
+  additionalNotes: z.string().optional(),
+  soulState: z.enum(['UNBELIEVER', 'NEW_CONVERT', 'UNCHURCHED_BELIEVER', 'HUNGRY_BELIEVER']).optional(),
+  gender: z.enum(['MALE', 'FEMALE']).optional(),
+  status: z.nativeEnum(LeadStatus).optional(),
+  assignedToId: z.string().cuid().optional().nullable(),
+  churchMembership: z.nativeEnum(ChurchMembership).optional().nullable(),
+  churchName: z.string().optional(),
+  monthsConsistent: z.number().int().min(0).optional(),
+});
+
+/** Fields a FOLLOWUP user can update (church progress only). */
+const followupUpdateSchema = z.object({
+  churchMembership: z.nativeEnum(ChurchMembership).optional().nullable(),
+  churchName: z.string().optional(),
+  monthsConsistent: z.number().int().min(0).optional(),
+});
+
+// ─── GET /api/leads/[id] ──────────────────────────────────────────────────────
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const lead = await prisma.lead.findUnique({
+      where: { id: params.id },
+      include: {
+        addedBy: { select: { id: true, name: true, phone: true, email: true } },
+        assignedTo: { select: { id: true, name: true, phone: true, email: true } },
+        notes: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
       },
-    },  
-  });
+    });
 
-  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  if (user.role === "FOLLOWUP" && lead.assignedToId !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (session.user.role === 'FOLLOWUP' && lead.assignedToId !== session.user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    return NextResponse.json(lead);
+  } catch (error) {
+    console.error(`GET /api/leads/${params.id} error:`, error);
+    return NextResponse.json({ error: 'Failed to fetch lead' }, { status: 500 });
   }
-
-  return NextResponse.json(lead);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// ─── PATCH /api/leads/[id] ────────────────────────────────────────────────────
 
-  const user = session.user as any;
-  const lead = await prisma.lead.findUnique({ where: { id: params.id } });
-  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (user.role === "FOLLOWUP" && lead.assignedToId !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+    const { id: userId, role } = session.user;
 
-  const body = await req.json();
+    const lead = await prisma.lead.findUnique({ where: { id: params.id } });
+    if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  // FOLLOWUP can only update church-related fields and notes
-  let updateData: any;
-  if (user.role === "FOLLOWUP") {
-    updateData = {
-      churchMembership: body.churchMembership,
-      churchName: body.churchName,
-      monthsConsistent: body.monthsConsistent,
-    };
-    // Remove undefined keys
-    Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
-  } else {
-    updateData = { ...body };
-    delete updateData.id;
-    delete updateData.addedById;
-  }
+    if (role === 'FOLLOWUP' && lead.assignedToId !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-  // Track if assignment is changing
-  const isAssignmentChange = body.assignedToId && lead.assignedToId !== body.assignedToId;
+    const body = await req.json();
 
-  // If admin assigns someone, update status to FOLLOWING_UP
-  if (isAssignmentChange) {
-    updateData.status = LeadStatus.FOLLOWING_UP;
-  }
+    // Parse against the appropriate schema for the caller's role.
+    const schema = role === 'FOLLOWUP' ? followupUpdateSchema : adminUpdateSchema;
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 422 }
+      );
+    }
 
-  const updated = await prisma.lead.update({
-    where: { id: params.id },
-    data: updateData,
-    include: {
-      addedBy: { select: { id: true, name: true } },
-      assignedTo: { select: { id: true, name: true, phone: true } },
-      notes: {
-        include: { user: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "asc" },
+    const updateData = parsed.data as Record<string, unknown>;
+    const isAssignmentChange =
+      'assignedToId' in updateData &&
+      updateData.assignedToId !== lead.assignedToId;
+
+    // Auto-advance status when assigning for the first time.
+    if (isAssignmentChange && updateData.assignedToId) {
+      updateData.status = LeadStatus.FOLLOWING_UP;
+    }
+
+    const updated = await prisma.lead.update({
+      where: { id: params.id },
+      data: updateData,
+      include: {
+        addedBy: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true, phone: true } },
+        notes: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
       },
-    },
-  });
+    });
 
-  // Log field changes
-  for (const [key, value] of Object.entries(updateData)) {
-    const oldValue = (lead as any)[key];
-    if (oldValue !== value) {
-      if (key === 'status') {
-        await logStatusChange(params.id, user.id, String(oldValue || ""), String(value || ""));
-      } else {
-        await logFieldChange(params.id, user.id, key, String(oldValue || ""), String(value || ""));
-      }
+    // Audit logging (fire-and-forget — don't delay response)
+    void auditChanges(params.id, userId, lead as Record<string, unknown>, updateData, isAssignmentChange, updated);
+
+    // Side-effects for assignment changes
+    if (isAssignmentChange && updated.assignedToId && updated.assignedTo) {
+      void sendAssignmentNotifications(updated);
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error(`PATCH /api/leads/${params.id} error:`, error);
+    return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 });
+  }
+}
+
+// ─── DELETE /api/leads/[id] ───────────────────────────────────────────────────
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Only admins can delete leads' }, { status: 403 });
+    }
+
+    await prisma.lead.delete({ where: { id: params.id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error(`DELETE /api/leads/${params.id} error:`, error);
+    return NextResponse.json({ error: 'Failed to delete lead' }, { status: 500 });
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function auditChanges(
+  leadId: string,
+  userId: string,
+  oldLead: Record<string, unknown>,
+  updateData: Record<string, unknown>,
+  isAssignmentChange: boolean,
+  updated: { assignedToId: string | null; assignedTo: { name: string } | null }
+): Promise<void> {
+  for (const [key, newValue] of Object.entries(updateData)) {
+    const oldValue = oldLead[key];
+    if (oldValue === newValue) continue;
+
+    if (key === 'status') {
+      await logStatusChange(leadId, userId, String(oldValue ?? ''), String(newValue ?? ''));
+    } else if (key !== 'assignedToId') {
+      await logFieldChange(leadId, userId, key, String(oldValue ?? ''), String(newValue ?? ''));
     }
   }
 
-  // Log assignment change
   if (isAssignmentChange) {
-    await logAssignment(
-      params.id,
-      user.id,
-      updated.assignedToId,
-      updated.assignedTo?.name
-    );
+    await logAssignment(leadId, userId, updated.assignedToId, updated.assignedTo?.name);
   }
+}
 
-  // Send SMS to assigned followup member
-  if (isAssignmentChange && updated.assignedTo?.phone) {
-    // console.log("sms")
+async function sendAssignmentNotifications(updated: {
+  id: string;
+  fullName: string;
+  location: string;
+  phone: string | null;
+  assignedToId: string | null;
+  assignedTo: { name: string; phone: string | null } | null;
+}): Promise<void> {
+  if (!updated.assignedTo || !updated.assignedToId) return;
+
+  // SMS
+  if (updated.assignedTo.phone) {
     try {
       const template = await getSMSTemplate(SMSType.FOLLOWUP_ASSIGNMENT);
-      const assignmentData = {
+      const message = renderTemplate(template, {
         assigneeName: updated.assignedTo.name,
         leadName: updated.fullName,
         location: updated.location,
-        phone: updated.phone || "N/A",
-      };
-
-      const message = renderTemplate(template, assignmentData);
-      sendSMS({
+        phone: updated.phone ?? 'N/A',
+      });
+      await sendSMS({
         phone: updated.assignedTo.phone,
         message,
         type: SMSType.FOLLOWUP_ASSIGNMENT,
         leadId: updated.id,
-      }).catch((err) => {
-        console.error(`Failed to send followup assignment SMS to ${updated.assignedTo?.phone}:`, err);
       });
-    } catch (smsError) {
-      console.error("Error sending followup assignment SMS:", smsError);
-      // Don't fail the request if SMS sending fails
-    }
-
-    // Send push notification to assigned followup member
-    if (updated.assignedToId) {
-      try {
-        configureWebPush();
-        await sendPushToUser(
-          updated.assignedToId,
-          {
-            title: 'New Lead Assignment',
-            body: `You have been assigned ${updated.fullName} from ${updated.location}`,
-            tag: `lead-assignment-${updated.id}`,
-            data: {
-              url: `/dashboard/followup/leads/${updated.id}`,
-              leadId: updated.id,
-            },
-          },
-          prisma
-        );
-      } catch (pushError) {
-        console.error('Error sending assignment push notification:', pushError);
-        // Don't fail the request if push fails
-      }
+    } catch (err) {
+      console.error('[Assignment] SMS error:', err);
     }
   }
 
-  return NextResponse.json(updated);
-}
-
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = session.user as any;
-  if (user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Only admins can delete leads" }, { status: 403 });
+  // Push
+  try {
+    configureWebPush();
+    await sendPushToUser(updated.assignedToId, {
+      title: 'New Lead Assignment',
+      body: `You have been assigned ${updated.fullName} from ${updated.location}`,
+      tag: `lead-assignment-${updated.id}`,
+      data: { url: `/dashboard/followup/leads/${updated.id}`, leadId: updated.id },
+    });
+  } catch (err) {
+    console.error('[Assignment] Push error:', err);
   }
-
-  await prisma.lead.delete({ where: { id: params.id } });
-  return NextResponse.json({ success: true });
 }

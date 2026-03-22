@@ -1,61 +1,69 @@
 export const dynamic = 'force-dynamic';
 
 // app/api/leads/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { LeadStatus, SMSType } from "@prisma/client";
-import { z } from "zod";
-import { sendSMS, getSMSTemplate, renderTemplate } from "@/lib/sms";
-import { sendPushToRole, configureWebPush } from "@/lib/push";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { LeadStatus, SMSType } from '@prisma/client';
+import { z } from 'zod';
+import { sendSMS, getSMSTemplate, renderTemplate } from '@/lib/sms';
+import { sendPushToRole, configureWebPush } from '@/lib/push';
+
+// ─── Validation schemas ───────────────────────────────────────────────────────
 
 const createLeadSchema = z.object({
-  fullName: z.string().min(1),
-  ageRange: z.enum(["UNDER_18","AGE_18_25","AGE_26_35","AGE_36_45","AGE_46_60","ABOVE_60"]),
+  fullName: z.string().min(1, 'Full name is required'),
+  ageRange: z.enum(['UNDER_18', 'AGE_18_25', 'AGE_26_35', 'AGE_36_45', 'AGE_46_60', 'ABOVE_60']),
   phone: z.string().optional(),
   address: z.string().optional(),
-  location: z.string().min(1),
+  location: z.string().min(1, 'Location is required'),
   additionalNotes: z.string().optional(),
-  soulState: z.enum(["NEW_CONVERT","UNCHURCHED_BELIEVER","HUNGRY_BELIEVER"]),
+  soulState: z.enum(['UNBELIEVER', 'NEW_CONVERT', 'UNCHURCHED_BELIEVER', 'HUNGRY_BELIEVER']),
+  gender: z.enum(['MALE', 'FEMALE']).optional(),
 });
+
+// ─── GET /api/leads ───────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const dateFrom = searchParams.get("dateFrom");
-    const dateTo = searchParams.get("dateTo");
-    const status = searchParams.get("status");
-    const soulState = searchParams.get("soulState");
-    const assignedToId = searchParams.get("assignedToId");
-    const addedById = searchParams.get("addedById");
-
-    const user = session.user as any;
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+    const limit = Math.min(1000, Math.max(1, parseInt(searchParams.get('limit') ?? '10', 10)));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const status = searchParams.get('status');
+    const soulState = searchParams.get('soulState');
+    const assignedToId = searchParams.get('assignedToId');
+    const addedById = searchParams.get('addedById');
 
-    // Allow explicit filter parameters
+    const { id: userId, role } = session.user;
+
+    // Build where clause — role restrictions come first, explicit filters can override.
+    const where: Record<string, unknown> = {};
+
     if (assignedToId) {
       where.assignedToId = assignedToId;
-    } else if (user.role === "FOLLOWUP") {
-      where.assignedToId = user.id;
+    } else if (role === 'FOLLOWUP') {
+      where.assignedToId = userId;
     }
 
     if (addedById) {
       where.addedById = addedById;
-    } else if (user.role === "EVANGELIST") {
-      where.addedById = user.id;
+    } else if (role === 'EVANGELIST') {
+      where.addedById = userId;
     }
+
     if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
+      const createdAt: Record<string, Date> = {};
+      if (dateFrom) createdAt.gte = new Date(dateFrom);
+      if (dateTo) createdAt.lte = new Date(`${dateTo}T23:59:59.999Z`);
+      where.createdAt = createdAt;
     }
 
     if (status) where.status = status;
@@ -69,10 +77,10 @@ export async function GET(req: NextRequest) {
           assignedTo: { select: { id: true, name: true, email: true } },
           notes: {
             include: { user: { select: { id: true, name: true } } },
-            orderBy: { createdAt: "desc" },
+            orderBy: { createdAt: 'desc' },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
@@ -80,102 +88,99 @@ export async function GET(req: NextRequest) {
     ]);
 
     return NextResponse.json({ leads, total, page, limit });
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/leads error:', error);
-    return NextResponse.json(
-      { error: "Failed to fetch leads", details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
   }
 }
 
+// ─── POST /api/leads ──────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = session.user as any;
-  if (user.role === "FOLLOWUP") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { id: userId, role } = session.user;
+    if (role === 'FOLLOWUP') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await req.json();
-    const data = createLeadSchema.parse(body);
+    const parsed = createLeadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 422 }
+      );
+    }
 
     const lead = await prisma.lead.create({
       data: {
-        ...data,
+        ...parsed.data,
         status: LeadStatus.NEW_LEAD,
-        addedBy: {  
-          connect: { id: user.id },
-        },
+        addedBy: { connect: { id: userId } },
       },
-      include: {
-        addedBy: { select: { id: true, name: true } },
-      },
+      include: { addedBy: { select: { id: true, name: true } } },
     });
 
-    // Send SMS alerts to all admins with phone numbers
-    try {
-      const admins = await prisma.user.findMany({
-        where: { role: "ADMIN" },
-        include: {
-          adminPhones: {
-            select: { phone: true },
-          },
-        },
-      });
+    // Fire side-effects in the background — never delay the response.
+    void sendAdminAlerts(lead);
 
-      const template = await getSMSTemplate(SMSType.ADMIN_ALERT);
-      const adminAlertData = {
-        leadName: lead.fullName,
-        phone: lead.phone || "N/A",
-        location: lead.location,
-        status: lead.status,
-      };
+    return NextResponse.json({ id: lead.id, ...lead }, { status: 201 });
+  } catch (error) {
+    console.error('POST /api/leads error:', error);
+    return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
+  }
+}
 
-      // Send SMS to all admin phone numbers asynchronously (don't wait)
-      admins.forEach((admin) => {
-        admin.adminPhones.forEach((phoneRecord) => {
-          const message = renderTemplate(template, adminAlertData);
-          sendSMS({
-            phone: phoneRecord.phone,
-            message,
-            type: SMSType.ADMIN_ALERT,
-            leadId: lead.id,
-          }).catch((err) => {
-            console.error(`Failed to send admin alert SMS to ${phoneRecord.phone}:`, err);
-          });
-        });
-      });
-    } catch (smsError) {
-      console.error("Error sending admin alert SMS:", smsError);
-      // Don't fail the request if SMS sending fails
+// ─── Background: admin SMS + push ────────────────────────────────────────────
+
+async function sendAdminAlerts(lead: {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  location: string;
+  status: string;
+}): Promise<void> {
+  const alertData = {
+    leadName: lead.fullName,
+    phone: lead.phone ?? 'N/A',
+    location: lead.location,
+    status: lead.status,
+  };
+
+  // SMS to every admin phone number
+  try {
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      include: { adminPhones: { select: { phone: true } } },
+    });
+
+    const template = await getSMSTemplate(SMSType.ADMIN_ALERT);
+    const message = renderTemplate(template, alertData);
+
+    for (const admin of admins) {
+      for (const { phone } of admin.adminPhones) {
+        sendSMS({ phone, message, type: SMSType.ADMIN_ALERT, leadId: lead.id }).catch((err) =>
+          console.error(`[Alert] SMS to ${phone} failed:`, err)
+        );
+      }
     }
+  } catch (err) {
+    console.error('[Alert] Admin SMS error:', err);
+  }
 
-    // Send push notifications to all admins
-    try {
-      configureWebPush();
-      await sendPushToRole(
-        'ADMIN',
-        {
-          title: 'New Lead Added',
-          body: `${lead.fullName} from ${lead.location} has been added to the system`,
-          tag: `new-lead-${lead.id}`,
-          data: {
-            url: '/dashboard/admin/leads',
-            leadId: lead.id,
-          },
-        },
-        prisma
-      );
-    } catch (pushError) {
-      console.error('Error sending admin alert push notification:', pushError);
-      // Don't fail the request if push sending fails
-    }
-
-    return NextResponse.json(lead, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+  // Push to all admins
+  try {
+    configureWebPush();
+    await sendPushToRole('ADMIN', {
+      title: 'New Lead Added',
+      body: `${lead.fullName} from ${lead.location} has been added`,
+      tag: `new-lead-${lead.id}`,
+      data: { url: '/dashboard/admin/leads', leadId: lead.id },
+    });
+  } catch (err) {
+    console.error('[Alert] Admin push error:', err);
   }
 }

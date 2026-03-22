@@ -209,7 +209,7 @@ export default function Sidebar() {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-harvest-400 rounded-xl hover:bg-harvest-50 text-white"
+        className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-harvest-400 rounded-xl hover:bg-earth-400 text-white"
       >
         {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>

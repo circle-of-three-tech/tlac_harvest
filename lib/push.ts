@@ -1,148 +1,149 @@
+// lib/push.ts
 import webpush from 'web-push';
+import { prisma } from './prisma';
 
-// Configure web-push with VAPID keys (must be set from environment)
-export function configureWebPush() {
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+// ─── VAPID configuration ──────────────────────────────────────────────────────
 
-  if (!vapidPublicKey || !vapidPrivateKey) {
+let configured = false;
+
+/**
+ * Configure VAPID once per process.
+ * Returns false (and warns) if env vars are missing.
+ */
+export function configureWebPush(): boolean {
+  if (configured) return true;
+
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+
+  if (!publicKey || !privateKey) {
     console.warn(
-      'Push notifications not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY env vars.'
+      '[Push] NEXT_PUBLIC_VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY not set — push disabled.'
     );
     return false;
   }
 
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:circleofthreetechnologies@gmail.com',
-    vapidPublicKey,
-    vapidPrivateKey
+    process.env.VAPID_SUBJECT ?? 'mailto:admin@tlacharvest.com.ng',
+    publicKey,
+    privateKey
   );
 
+  configured = true;
   return true;
 }
 
-export interface PushNotificationPayload {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface PushPayload {
   title: string;
   body: string;
   icon?: string;
   badge?: string;
-  tag?: string; // For grouping notifications
-  data?: {
-    url?: string;
-    [key: string]: any;
-  };
+  tag?: string;
+  data?: Record<string, unknown>;
 }
 
+interface RawSubscription {
+  id: string;
+  endpoint: string;
+  auth: string;
+  p256dh: string;
+  userId: string;
+}
+
+interface SendResult {
+  sent: number;
+  failed: number;
+  stale: number;
+}
+
+// ─── Core send function ───────────────────────────────────────────────────────
+
 /**
- * Send push notification to a user's subscriptions
+ * Send a push notification to a list of subscriptions.
+ * Automatically deletes subscriptions that report as expired/invalid (410/404).
  */
-export async function sendPushNotification(
-  subscriptions: Array<{ endpoint: string; auth: string; p256dh: string }>,
-  payload: PushNotificationPayload
-): Promise<{ sent: number; failed: number; errors: Array<{ endpoint: string; error: string }> }> {
-  if (!subscriptions.length) {
-    return { sent: 0, failed: 0, errors: [] };
+async function sendToSubscriptions(
+  subscriptions: RawSubscription[],
+  payload: PushPayload
+): Promise<SendResult> {
+  if (!configureWebPush() || subscriptions.length === 0) {
+    return { sent: 0, failed: 0, stale: 0 };
   }
 
-  const results = { sent: 0, failed: 0, errors: [] as Array<{ endpoint: string; error: string }> };
+  const result: SendResult = { sent: 0, failed: 0, stale: 0 };
+  const staleIds: string[] = [];
 
-  for (const subscription of subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          keys: {
-            auth: subscription.auth,
-            p256dh: subscription.p256dh,
-          },
-        },
-        JSON.stringify(payload)
-      );
-      results.sent++;
-    } catch (error) {
-      results.failed++;
-      results.errors.push({
-        endpoint: subscription.endpoint,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+  await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { auth: sub.auth, p256dh: sub.p256dh } },
+          JSON.stringify(payload)
+        );
+        result.sent++;
+      } catch (err: unknown) {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 410 || status === 404) {
+          // Subscription expired — mark for cleanup
+          staleIds.push(sub.id);
+          result.stale++;
+        } else {
+          result.failed++;
+          console.error(`[Push] Failed to send to ${sub.endpoint}:`, err);
+        }
+      }
+    })
+  );
+
+  // Clean up expired subscriptions in one batch
+  if (staleIds.length > 0) {
+    await prisma.pushSubscription
+      .deleteMany({ where: { id: { in: staleIds } } })
+      .catch((e) => console.error('[Push] Failed to delete stale subscriptions:', e));
   }
 
-  return results;
+  return result;
 }
 
-/**
- * Send push notification to all users with a specific role
- */
-export async function sendPushToRole(
-  role: 'EVANGELIST' | 'FOLLOWUP' | 'ADMIN',
-  payload: PushNotificationPayload,
-  prisma: any
-): Promise<{ sent: number; failed: number; skipped: number }> {
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: {
-      user: {
-        role: role,
-      },
-    },
-  });
-
-  if (subscriptions.length === 0) {
-    return { sent: 0, failed: 0, skipped: 0 };
-  }
-
-  const formattedSubs = subscriptions.map((sub: any) => ({
-    endpoint: sub.endpoint,
-    auth: sub.auth,
-    p256dh: sub.p256dh,
-  }));
-
-  const result = await sendPushNotification(formattedSubs, payload);
-
-  return {
-    sent: result.sent,
-    failed: result.failed,
-    skipped: subscriptions.length - result.sent - result.failed,
-  };
-}
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Send push notification to a specific user's devices
+ * Send to all subscriptions belonging to a specific user.
  */
 export async function sendPushToUser(
   userId: string,
-  payload: PushNotificationPayload,
-  prisma: any
-): Promise<{ sent: number; failed: number }> {
+  payload: PushPayload
+): Promise<SendResult> {
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   });
 
-  if (subscriptions.length === 0) {
-    return { sent: 0, failed: 0 };
-  }
-
-  const formattedSubs = subscriptions.map((sub: any) => ({
-    endpoint: sub.endpoint,
-    auth: sub.auth,
-    p256dh: sub.p256dh,
-  }));
-
-  const result = await sendPushNotification(formattedSubs, payload);
-
-  return {
-    sent: result.sent,
-    failed: result.failed,
-  };
+  return sendToSubscriptions(subscriptions, payload);
 }
 
 /**
- * Generate VAPID keys (run once and store in .env.local)
- * Usage: node -e "require('./lib/push').generateVapidKeys()"
+ * Send to all subscriptions belonging to users with a specific role.
  */
-export function generateVapidKeys() {
-  const vapidKeys = webpush.generateVAPIDKeys();
-  console.log('NEXT_PUBLIC_VAPID_PUBLIC_KEY:', vapidKeys.publicKey);
-  console.log('VAPID_PRIVATE_KEY:', vapidKeys.privateKey);
-  console.log('\nAdd these to your .env.local file');
+export async function sendPushToRole(
+  role: 'EVANGELIST' | 'FOLLOWUP' | 'ADMIN',
+  payload: PushPayload
+): Promise<SendResult> {
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { user: { role } },
+    select: { id: true, endpoint: true, auth: true, p256dh: true, userId: true },
+  });
+
+  return sendToSubscriptions(subscriptions, payload);
+}
+
+/**
+ * Utility: generate VAPID keys (run once, store in .env).
+ * Usage: npx tsx -e "import('./lib/push').then(m => m.generateVapidKeys())"
+ */
+export function generateVapidKeys(): void {
+  const keys = webpush.generateVAPIDKeys();
+  console.log('NEXT_PUBLIC_VAPID_PUBLIC_KEY=' + keys.publicKey);
+  console.log('VAPID_PRIVATE_KEY=' + keys.privateKey);
 }

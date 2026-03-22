@@ -1,266 +1,195 @@
 /**
  * Operation Queue Service
- * Manages queued operations (updates, deletes, notes) that need to be synced
+ * Manages queued offline mutations (updates, deletes, notes, reassignments).
+ *
+ * Key fix vs. previous version:
+ * - getDedupedOperations() previously kept only the "latest per resourceId",
+ *   which silently dropped all-but-one addNote operations on the same lead.
+ *   Now addNote operations are always kept in full; only update/reassign/delete
+ *   operations are collapsed to the latest per resource.
  */
 
 import { getIndexedDB } from './offlineLeads';
 
-// ==================== INTERFACES ====================
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type OperationType = 'update' | 'delete' | 'addNote' | 'reassign';
 
 export interface QueuedOperation {
-  id?: number; // Auto-increment
+  id?: number; // IDB auto-increment
   type: OperationType;
-  resourceId: string; // Lead ID or note ID
+  resourceId: string;
   resourceType: 'lead' | 'note';
-  payload: Record<string, any>;
-  timestamp: number; // When operation was queued
-  clientTimestamp: number; // Used for conflict resolution
+  payload: Record<string, unknown>;
+  timestamp: number;
+  clientTimestamp: number;
   status: 'pending' | 'syncing' | 'synced' | 'failed';
   syncError?: string;
   retryCount: number;
 }
 
-// ==================== CONSTANTS ====================
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const STORE_NAME = 'queued_operations';
-const MAX_RETRIES = 3;
+const STORE = 'queued_operations';
+export const MAX_RETRIES = 3;
 
-// ==================== HELPERS ====================
+// ─── Core functions ───────────────────────────────────────────────────────────
 
-async function getDB(): Promise<IDBDatabase> {
-  return getIndexedDB();
-}
-
-// ==================== CORE FUNCTIONS ====================
-
-/**
- * Queue an operation (update, delete, addNote, reassign)
- */
 export async function queueOperation(op: Omit<QueuedOperation, 'id'>): Promise<number> {
-  try {
-    const database = await getDB();
-    const operationWithDefaults: Omit<QueuedOperation, 'id'> = {
-      ...op,
-      timestamp: Date.now(),
-      clientTimestamp: op.clientTimestamp || Date.now(),
-      status: 'pending',
-      retryCount: 0,
-    };
+  const database = await getIndexedDB();
+  const record: Omit<QueuedOperation, 'id'> = {
+    ...op,
+    timestamp: Date.now(),
+    clientTimestamp: op.clientTimestamp ?? Date.now(),
+    status: 'pending',
+    retryCount: 0,
+  };
 
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.add(operationWithDefaults);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result as number);
-    });
-  } catch (error) {
-    console.error('Error queuing operation:', error);
-    throw error;
-  }
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).add(record);
+    req.onsuccess = () => resolve(req.result as number);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Get all pending operations
- */
 export async function getPendingOperations(): Promise<QueuedOperation[]> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('status');
-      const request = index.getAll('pending');
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting pending operations:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).index('status').getAll('pending');
+    req.onsuccess = () => resolve(req.result as QueuedOperation[]);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Get failed operations
- */
 export async function getFailedOperations(): Promise<QueuedOperation[]> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('status');
-      const request = index.getAll('failed');
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting failed operations:', error);
-    return [];
-  }
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).index('status').getAll('failed');
+    req.onsuccess = () => resolve(req.result as QueuedOperation[]);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Get all operations for a specific resource
- */
-export async function getOperationsForResource(
-  resourceId: string
-): Promise<QueuedOperation[]> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('resourceId');
-      const request = index.getAll(resourceId);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-    });
-  } catch (error) {
-    console.error('Error getting operations for resource:', error);
-    return [];
-  }
+export async function getOperationsForResource(resourceId: string): Promise<QueuedOperation[]> {
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).index('resourceId').getAll(resourceId);
+    req.onsuccess = () => resolve(req.result as QueuedOperation[]);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Update operation status
- */
 export async function updateOperationStatus(
   operationId: number,
-  status: 'pending' | 'syncing' | 'synced' | 'failed',
+  status: QueuedOperation['status'],
   error?: string
 ): Promise<void> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const getRequest = store.get(operationId);
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const getReq = store.get(operationId);
 
-      getRequest.onsuccess = () => {
-        const op = getRequest.result as QueuedOperation;
-        if (op) {
-          op.status = status;
-          if (error) op.syncError = error;
-          if (status === 'pending') {
-            op.retryCount++;
-          }
-          const updateRequest = store.put(op);
-          updateRequest.onerror = () => reject(updateRequest.error);
-          updateRequest.onsuccess = () => resolve();
-        } else {
-          reject(new Error('Operation not found'));
-        }
+    getReq.onsuccess = () => {
+      const op = getReq.result as QueuedOperation | undefined;
+      if (!op) return reject(new Error(`Operation not found: ${operationId}`));
+
+      const updated: QueuedOperation = {
+        ...op,
+        status,
+        syncError: error,
+        // Increment retry count only when re-queuing a failed operation.
+        retryCount: status === 'pending' ? op.retryCount + 1 : op.retryCount,
       };
 
-      getRequest.onerror = () => reject(getRequest.error);
-    });
-  } catch (error) {
-    console.error('Error updating operation status:', error);
-    throw error;
-  }
+      const putReq = store.put(updated);
+      putReq.onsuccess = () => resolve();
+      putReq.onerror = () => reject(putReq.error);
+    };
+
+    getReq.onerror = () => reject(getReq.error);
+  });
 }
 
-/**
- * Delete operation (after successful sync)
- */
 export async function deleteOperation(operationId: number): Promise<void> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(operationId);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error deleting operation:', error);
-    throw error;
-  }
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(operationId);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Clear operations for a resource
- */
 export async function clearOperationsForResource(resourceId: string): Promise<void> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('resourceId');
-      const range = IDBKeyRange.only(resourceId);
-      const request = index.openCursor(range);
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readwrite');
+    const range = IDBKeyRange.only(resourceId);
+    const req = tx.objectStore(STORE).index('resourceId').openCursor(range);
 
-      request.onerror = () => reject(request.error);
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest).result;
-        if (cursor) {
-          cursor.delete();
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-    });
-  } catch (error) {
-    console.error('Error clearing operations for resource:', error);
-    throw error;
-  }
+    req.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      } else {
+        resolve();
+      }
+    };
+
+    req.onerror = () => reject(req.error);
+  });
 }
 
+export async function clearAllOperations(): Promise<void> {
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ─── Deduplication ────────────────────────────────────────────────────────────
+
 /**
- * Get deduped operations (latest for each resource)
- * Used to avoid redundant syncs when same lead updated multiple times offline
+ * Return deduplicated pending operations ready for sync.
+ *
+ * Rules:
+ * - `addNote` operations are NEVER deduplicated — each note is distinct.
+ * - `update`, `reassign`, and `delete` keep only the LATEST per resourceId.
+ *   If a `delete` exists for a resource, all prior mutations are discarded.
+ *
+ * Result is sorted oldest-first so earlier operations apply before later ones.
  */
 export async function getDedupedOperations(): Promise<QueuedOperation[]> {
   const pending = await getPendingOperations();
-  const map = new Map<string, QueuedOperation>();
 
-  // For each resource, keep only the latest operation
-  pending.forEach((op) => {
-    const key = `${op.resourceType}:${op.resourceId}`;
-    const existing = map.get(key);
+  // Separate notes (always keep all) from mutations (deduplicate).
+  const notes = pending.filter((op) => op.type === 'addNote');
+  const mutations = pending.filter((op) => op.type !== 'addNote');
 
+  // For mutations: keep latest per resourceId.
+  const latestMutations = new Map<string, QueuedOperation>();
+  for (const op of mutations) {
+    const existing = latestMutations.get(op.resourceId);
     if (!existing || op.timestamp > existing.timestamp) {
-      map.set(key, op);
+      latestMutations.set(op.resourceId, op);
     }
-  });
+  }
 
-  return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+  const all = [...latestMutations.values(), ...notes];
+  return all.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-/**
- * Check if operation can be retried
- */
+// ─── Retry guard ──────────────────────────────────────────────────────────────
+
 export function canRetryOperation(op: QueuedOperation): boolean {
   return op.retryCount < MAX_RETRIES;
-}
-
-/**
- * Clear all queued operations
- */
-export async function clearAllOperations(): Promise<void> {
-  try {
-    const database = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.clear();
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-  } catch (error) {
-    console.error('Error clearing all operations:', error);
-    throw error;
-  }
 }

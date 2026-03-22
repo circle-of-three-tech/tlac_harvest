@@ -1,37 +1,64 @@
 'use client';
 
 /**
- * Hook to detect if app is offline and handle offline-first lead creation
+ * useOfflineLeadCreation
+ * Online-first lead creation with automatic offline fallback.
+ *
+ * Fallback policy:
+ * - Network errors (no connection, DNS, timeout) → save offline and sync later.
+ * - API errors (4xx / 5xx) → throw immediately so the UI can surface them.
+ *   This prevents duplicates or invalid records from being queued offline.
+ *
+ * ID generation uses crypto.randomUUID() for collision safety.
  */
 
 import { useSyncStatus } from '@/components/SyncProvider';
-import { saveOfflineLead } from '@/lib/offlineLeads';
-import { OfflineLead } from '@/lib/offlineLeads';
+import { saveOfflineLead, type OfflineLead } from '@/lib/offlineLeads';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface LeadPayload {
+  fullName: string;
+  ageRange: string;
+  phone: string;
+  address?: string;
+  location?: string;
+  additionalNotes?: string;
+  soulState?: string;
+  gender?: string;
+}
 
 export interface UseOfflineLeadCreationOptions {
-  onSuccess?: (leadId: string) => void;
+  onSuccess?: (leadId: string, savedOffline: boolean) => void;
   onError?: (error: Error) => void;
 }
 
-export function useOfflineLeadCreation(options: UseOfflineLeadCreationOptions = {}) {
+export interface UseOfflineLeadCreationResult {
+  isOnline: boolean;
+  createLead: (leadData: LeadPayload) => Promise<string>;
+}
+
+// ─── Network-error discrimination ─────────────────────────────────────────────
+
+/**
+ * Returns true only for errors that indicate the request never reached the
+ * server (no connection, DNS, timeout). HTTP 4xx / 5xx responses from the
+ * server are intentional API errors and must NOT be silently queued offline.
+ */
+function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError;
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useOfflineLeadCreation(
+  options: UseOfflineLeadCreationOptions = {}
+): UseOfflineLeadCreationResult {
   const { isOnline } = useSyncStatus();
 
-  /**
-   * Create a lead (either online via API or offline via storage)
-   * Uses online-first with automatic fallback to offline on failure
-   */
-  const createLead = async (leadData: {
-    fullName: string;
-    ageRange: string;
-    phone: string;
-    address?: string;
-    location?: string;
-    additionalNotes?: string;
-    soulState?: string;
-    gender?: string;
-  }): Promise<string> => {
+  const createLead = async (leadData: LeadPayload): Promise<string> => {
     try {
-      // Always try online first if we have connectivity
+      // ── Online path ────────────────────────────────────────────────────────
       if (isOnline) {
         try {
           const response = await fetch('/api/leads', {
@@ -40,48 +67,51 @@ export function useOfflineLeadCreation(options: UseOfflineLeadCreationOptions = 
             body: JSON.stringify(leadData),
           });
 
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create lead');
+          if (response.ok) {
+            const data = await response.json();
+            options.onSuccess?.(data.id, false);
+            return data.id;
           }
 
-          const data = await response.json();
-          options.onSuccess?.(data.id);
-          return data.id;
-        } catch (apiError) {
-          // If online request fails, fall back to offline storage
-          console.log('Online lead creation failed, falling back to offline storage:', apiError);
-          // Continue to offline creation below
+          // Server returned an API error (validation, conflict, auth, etc.).
+          // Parse the body and throw — do NOT fall back to offline storage.
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error(
+            errorBody.error ??
+            errorBody.message ??
+            `Lead creation failed (HTTP ${response.status})`
+          );
+        } catch (err) {
+          // Only fall through to offline storage on network-level failures.
+          if (!isNetworkError(err)) throw err;
+          console.warn('[useOfflineLeadCreation] Network error, saving offline:', err);
         }
       }
 
-      // Offline or fallback: save to local storage
+      // ── Offline (or network-error fallback) path ───────────────────────────
       const offlineLead: OfflineLead = {
-        id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         fullName: leadData.fullName,
         ageRange: leadData.ageRange,
         phone: leadData.phone,
-        address: leadData.address || '',
-        location: leadData.location || '',
-        additionalNotes: leadData.additionalNotes || '',
-        soulState: leadData.soulState || '',
-        gender: leadData.gender || '',
+        address: leadData.address ?? '',
+        location: leadData.location ?? '',
+        additionalNotes: leadData.additionalNotes ?? '',
+        soulState: leadData.soulState ?? '',
+        gender: leadData.gender ?? '',
         createdAt: new Date().toISOString(),
         syncStatus: 'pending',
       };
 
       await saveOfflineLead(offlineLead);
-      options.onSuccess?.(offlineLead.id);
+      options.onSuccess?.(offlineLead.id, true);
       return offlineLead.id;
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Unknown error');
+      const err = error instanceof Error ? error : new Error('Unknown error during lead creation');
       options.onError?.(err);
       throw err;
     }
   };
 
-  return {
-    isOnline,
-    createLead,
-  };
+  return { isOnline, createLead };
 }
