@@ -44,9 +44,9 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
     setEvangelists(evangelists.filter(e => e.id !== deletedId));
   };
 
-   const truncate = (str, max) => str.length > max ? str.slice(0, max) + "..." : str;
+   const truncate = (str: string, max: number): string => str.length > max ? str.slice(0, max) + "..." : str;
  
-   
+
   return (
     <>
       {/* Desktop Table View */}

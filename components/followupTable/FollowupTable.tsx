@@ -44,7 +44,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
       setFollowups(followups.filter(f => f.id !== deletedId));
     };
 
-    const truncate = (str, max) => str.length > max ? str.slice(0, max) + "..." : str;
+    const truncate = (str: string, max: number): string => str.length > max ? str.slice(0, max) + "..." : str;
  
     return (
       <>
