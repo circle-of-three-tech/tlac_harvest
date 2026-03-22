@@ -248,7 +248,7 @@ export default function AdminDashboardPage() {
                     link: "/dashboard/admin/followups",
                   },
                 ].map((card, index) => (
-                  <Link href={card.link} key={index}>
+                  <Link href={card.link} key={index} className="w-full">
                     <div className={`harvest-card p-4 bg-white shadow-md`}>
                       <div
                         className={`inline-flex p-2 rounded-xl ${card.bg} ${card.text} mb-2`}
