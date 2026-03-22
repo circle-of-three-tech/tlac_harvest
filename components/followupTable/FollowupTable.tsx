@@ -10,8 +10,9 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
     const [followups, setFollowups] = useState(initialFollowups);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingFollowup, setEditingFollowup] = useState<any>(null);
+    const [editingFollowupId, setEditingFollowupId] = useState<string>(null);
     const [showEditModal, setShowEditModal] = useState(false);
+
 
     const openLeadsModal = (user: any) => {
       setSelectedUser(user);
@@ -25,14 +26,15 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
 
     const openEditModal = (e: React.MouseEvent, user: any) => {
       e.stopPropagation();
-      setEditingFollowup(user);
+      setEditingFollowupId(user.id);
       setShowEditModal(true);
     };
 
     const closeEditModal = () => {
       setShowEditModal(false);
-      setEditingFollowup(null);
+      setEditingFollowupId("");
     };
+
 
     const handleEditSuccess = (updatedFollowup: any) => {
       // Update the followup in the list
@@ -88,7 +90,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
                   <td onClick={() => openLeadsModal(user)} className="text-slate-400 text-sm cursor-pointer">{format(new Date(user.createdAt), "MMM d, yyyy")}</td>
                   <td>
                     <button
-                      onClick={(e) => openEditModal(e, user)}
+                      onClick={(e) => openEditModal(e, user.id)}
                       className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-100 transition text-sm font-medium"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -123,7 +125,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
                 </div>
 
                 <button
-                  onClick={(e) => openEditModal(e, user)}
+                  onClick={(e) => openEditModal(e, user.id)}
                   className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition"
                 >
                   <Edit2 className="w-4 h-4 text-blue-700" />
@@ -157,7 +159,7 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
         <EditFollowupModal
           isOpen={showEditModal}
           onClose={closeEditModal}
-          followupMember={editingFollowup}
+          followupMember={editingFollowupId}
           onSuccess={handleEditSuccess}
           onDelete={handleDeleteSuccess}
         />

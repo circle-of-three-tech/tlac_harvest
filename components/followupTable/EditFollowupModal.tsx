@@ -21,18 +21,18 @@ interface FollowupMember {
 export default function EditFollowupModal({
   isOpen,
   onClose,
-  followupMember,
+  followupMemberId,
   onSuccess,
   onDelete,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  followupMember: FollowupMember | null;
+  followupMemberId: string | null;
   onSuccess: (updatedFollowupMember: FollowupMember) => void;
   onDelete?: (followupMemberId: string) => void;
 }) {
   const [form, setForm] = useState<FollowupMember>(
-    followupMember || {
+    {
       id: "",
       name: "",
       email: "",
@@ -47,15 +47,33 @@ export default function EditFollowupModal({
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const fetchEvangelist = async (id: string) => {
+    try {
+      setLoading(true);
+      setError("");
+      const res = await fetch(`/api/users/${id}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to fetch evangelist details");
+      }
+      const data = await res.json();
+      setForm(data);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load evangelist details";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+    
   // Update form when followupMember prop changes
   useEffect(() => {
-    if (followupMember && isOpen) {
-      setForm(followupMember);
-      setError("");
-      setShowDeleteConfirm(false);
+    if (followupMemberId && isOpen) {
+      fetchEvangelist(followupMemberId);
     }
-  }, [followupMember, isOpen]);
-
+  }, [followupMemberId, isOpen]);
+   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -117,7 +135,7 @@ export default function EditFollowupModal({
     }
   };
 
-  if (!isOpen || !followupMember) return null;
+  if (!isOpen || !followupMemberId) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm">

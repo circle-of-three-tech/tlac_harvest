@@ -10,7 +10,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
   const [evangelists, setEvangelists] = useState(initialEvangelists);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEvangelist, setEditingEvangelist] = useState<any>(null);
+  const [editingEvangelistId, setEditingEvangelistId] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   const openLeadsModal = (user: any) => {
@@ -23,15 +23,15 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
     setSelectedUser(null);
   };
 
-  const openEditModal = (e: React.MouseEvent, user: any) => {
+  const openEditModal = (e: React.MouseEvent, userId: string) => {
     e.stopPropagation();
-    setEditingEvangelist(user);
+    setEditingEvangelistId(userId);
     setShowEditModal(true);
   };
 
   const closeEditModal = () => {
     setShowEditModal(false);
-    setEditingEvangelist(null);
+    setEditingEvangelistId(null);
   };
 
   const handleEditSuccess = (updatedEvangelist: any) => {
@@ -91,7 +91,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
             </td>
             <td>
               <button
-                onClick={(e) => openEditModal(e, user)}
+                onClick={(e) => openEditModal(e, user.id)}
                 className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-harvest-700 hover:bg-harvest-100 transition text-sm font-medium"
               >
                 <Edit2 className="w-4 h-4" />
@@ -125,7 +125,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
                 </div>
               </div>
               <button
-                onClick={(e) => openEditModal(e, user)}
+                onClick={(e) => openEditModal(e, user.id)}
                 className="flex-shrink-0 p-2 rounded-lg hover:bg-harvest-100 transition"
               >
                 <Edit2 className="w-4 h-4 text-harvest-700" />
@@ -159,7 +159,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
       <EditEvangelistModal
         isOpen={showEditModal}
         onClose={closeEditModal}
-        evangelist={editingEvangelist}
+        evangelistId={editingEvangelistId}
         onSuccess={handleEditSuccess}
         onDelete={handleDeleteSuccess}
       />

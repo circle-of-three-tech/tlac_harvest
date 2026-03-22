@@ -21,18 +21,18 @@ interface Evangelist {
 export default function EditEvangelistModal({
   isOpen,
   onClose,
-  evangelist,
+  evangelistId,
   onSuccess,
   onDelete,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  evangelist: Evangelist | null;
+  evangelistId: string | null;
   onSuccess: (updatedEvangelist: Evangelist) => void;
   onDelete?: (evangelistId: string) => void;
 }) {
   const [form, setForm] = useState<Evangelist>(
-    evangelist || {
+     {
       id: "",
       name: "",
       email: "",
@@ -47,14 +47,40 @@ export default function EditEvangelistModal({
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Update form when evangelist prop changes
-  useEffect(() => {
-    if (evangelist && isOpen) {
-      setForm(evangelist);
+  const fetchEvangelist = async (id: string) => {
+    try {
+      setLoading(true);
       setError("");
-      setShowDeleteConfirm(false);
+      const res = await fetch(`/api/users/${id}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to fetch evangelist details");
+      }
+      const data = await res.json();
+      setForm(data);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load evangelist details";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-  }, [evangelist, isOpen]);
+  };
+
+  useEffect(() => {
+    if (isOpen && evangelistId) {
+      fetchEvangelist(evangelistId);
+    }
+  }, [isOpen, evangelistId]);
+
+  // Update form when evangelist prop changes
+  // useEffect(() => {
+  //   if (evangelist && isOpen) {
+  //     setForm(evangelist);
+  //     setError("");
+  //     setShowDeleteConfirm(false);
+  //   }
+  // }, [evangelist, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +144,7 @@ export default function EditEvangelistModal({
     }
   };
 
-  if (!isOpen || !evangelist) return null;
+  if (!isOpen || !evangelistId) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm">
@@ -134,6 +160,12 @@ export default function EditEvangelistModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+      {loading && (  
+        <div className="p-2 flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-harvest-500"></div>
+          <p>Loading...</p>
+        </div>
+        )}  
 
         <form
           onSubmit={handleSubmit}

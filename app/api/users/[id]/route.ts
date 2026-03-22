@@ -104,7 +104,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const body = await req.json();
+    const body = await req.json();  
 
     // Use appropriate schema based on user role
     const schema = userRole === 'ADMIN' ? adminUpdateSchema : selfUpdateSchema;
