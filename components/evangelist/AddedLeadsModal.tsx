@@ -191,7 +191,7 @@ const AddedLeadsModal = ({ user, isOpen, onClose }: AddedLeadsModalProps) => {
                                 }
                                 className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
                               >
-                                <span><NotepadText /> Follow-up Notes</span>
+                                <span className='flex items-center gap-2'><NotepadText size={12}/> Follow-up Notes</span>
                                 <span className="text-xs">
                                   {expandedLeadId === lead.id ? <ChevronDown size={12} />: <ChevronRight size={12} />}
                                 </span>
@@ -215,7 +215,7 @@ const AddedLeadsModal = ({ user, isOpen, onClose }: AddedLeadsModalProps) => {
                                 }
                                 className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
                               >
-                                <span><Pin /> Additional Notes</span>
+                                <span className='flex items-center gap-2'><Pin size={12}/> Additional Notes</span>
                                 <span className="text-xs">
                                   {expandedLeadId === `${lead.id}-additional`
                                     ? <ChevronDown size={12} />
