@@ -65,8 +65,7 @@ export async function POST(req: Request) {
         badge: payload.badge,
         tag: payload.tag,
         data: payload.data,
-      },
-      prisma
+      }
     );
 
     return Response.json(

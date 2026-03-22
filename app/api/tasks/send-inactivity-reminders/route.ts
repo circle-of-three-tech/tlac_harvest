@@ -76,7 +76,7 @@ export async function POST(req: Request) {
             };
 
       try {
-        const result = await sendPushToUser(user.id, messageConfig, prisma);
+        const result = await sendPushToUser(user.id, messageConfig);
         sentCount += result.sent;
         failedCount += result.failed;
       } catch (error) {
