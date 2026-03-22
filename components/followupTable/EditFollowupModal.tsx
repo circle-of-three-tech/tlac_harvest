@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { CircleX, X, AlertCircle, Save, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
 
 const GENDER_OPTIONS = [
   { value: "", label: "No Gender" },
@@ -79,13 +78,11 @@ export default function EditFollowupModal({
       }
 
       const updatedFollowupMember = await res.json();
-      toast.success("Followup member updated successfully");
       onSuccess(updatedFollowupMember);
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update followup member";
       setError(message);
-      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -111,7 +108,6 @@ export default function EditFollowupModal({
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to delete followup member";
       setError(message);
-      toast.error(message);
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);

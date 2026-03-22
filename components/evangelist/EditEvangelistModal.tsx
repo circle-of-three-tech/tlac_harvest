@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { CircleX, X, AlertCircle, Save, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
 
 const GENDER_OPTIONS = [
   { value: "", label: "No Gender" },
@@ -79,13 +78,11 @@ export default function EditEvangelistModal({
       }
 
       const updatedEvangelist = await res.json();
-      toast.success("Evangelist updated successfully");
       onSuccess(updatedEvangelist);
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update evangelist";
       setError(message);
-      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -105,13 +102,12 @@ export default function EditEvangelistModal({
         throw new Error(data.error || "Failed to delete evangelist");
       }
 
-      toast.success("Evangelist deleted successfully");
+
       onDelete?.(form.id);
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to delete evangelist";
       setError(message);
-      toast.error(message);
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
