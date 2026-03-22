@@ -22,6 +22,7 @@ import {
   Thermometer,
   ChevronDown,
   ChevronRight,
+  Filter,
 } from "lucide-react";
 import {
   LEAD_STATUS_LABELS,
@@ -31,6 +32,7 @@ import {
   SOUL_STATE_COLORS,
 } from "@/lib/utils";
 import ProgressBar from "@/components/evangelist/Progressbar";
+import Link from "next/link";
 
 const ATTENDANCE_COLORS = {
   cold: "#93c5fd",
@@ -44,7 +46,7 @@ export default function AdminDashboardPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
- const[currentSoulsTarget, setCurrentSoulsTarget] = useState(0);
+  const [currentSoulsTarget, setCurrentSoulsTarget] = useState(0);
   const [totalSoulsTarget, setTotalSoulsTarget] = useState(0);
 
   const fetchStats = async () => {
@@ -144,7 +146,7 @@ export default function AdminDashboardPage() {
               onClick={() => setIsFilterOpen((prev) => !prev)}
               className="w-full flex justify-between text-white bg-harvest-500 py-2 px-4 rounded-xl"
             >
-              Date Filter{" "}
+              <Filter /> Date Filter{" "}
               {isFilterOpen ? <ChevronDown /> : <ChevronRight />}{" "}
             </button>
           </div>
@@ -159,7 +161,7 @@ export default function AdminDashboardPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="harvest-input text-xs py-2 w-full sm:w-36"
+                className="harvest-input text-xs py-2 w-full"
               />
             </div>
             <div>
@@ -168,7 +170,7 @@ export default function AdminDashboardPage() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="harvest-input text-xs py-2 w-full sm:w-36"
+                className="harvest-input text-xs py-2 w-full"
               />
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
@@ -198,21 +200,20 @@ export default function AdminDashboardPage() {
         </div>
       ) : (
         <>
-         <div>
-         
-                <ProgressBar
-                  total={totalSoulsTarget || 0}
-                  current={currentSoulsTarget || 0}
-                  label="Evangelism Progress"
-                  fillColor="#e4a442"
-                  trackColor="#fae5bc"
-                  height={22}
-                  radius={8}
-                  showValues
-                  showPercent
-                  animated
-                />
-              </div>
+          <div>
+            <ProgressBar
+              total={totalSoulsTarget || 0}
+              current={currentSoulsTarget || 0}
+              label="Evangelism Progress"
+              fillColor="#e4a442"
+              trackColor="#fae5bc"
+              height={22}
+              radius={8}
+              showValues
+              showPercent
+              animated
+            />
+          </div>
           <div className="w-full flex flex-col md:flex-row mb-6 gap-4">
             {/* KPI Cards 1*/}
             <div className=" w-full bg-black/5 p-4 rounded-xl">
@@ -226,6 +227,7 @@ export default function AdminDashboardPage() {
                     bg: "bg-harvest-50",
                     text: "text-harvest-600",
                     border: "border-harvest-200",
+                    link: "/dashboard/admin/leads",
                   },
                   {
                     label: "Evangelists",
@@ -234,6 +236,7 @@ export default function AdminDashboardPage() {
                     bg: "bg-purple-50",
                     text: "text-purple-600",
                     border: "border-purple-200",
+                    link: "/dashboard/admin/evangelist",
                   },
                   {
                     label: "Follow-Up",
@@ -242,24 +245,24 @@ export default function AdminDashboardPage() {
                     bg: "bg-blue-50",
                     text: "text-blue-600",
                     border: "border-blue-200",
+                    link: "/dashboard/admin/followup",
                   },
-                ].map((card) => (
-                  <div
-                    key={card.label}
-                    className={`harvest-card p-4 bg-white shadow-md`}
-                  >
-                    <div
-                      className={`inline-flex p-2 rounded-xl ${card.bg} ${card.text} mb-2`}
-                    >
-                      <card.icon className="w-4 h-4" />
+                ].map((card, index) => (
+                  <Link href={card.link} key={index}>
+                    <div className={`harvest-card p-4 bg-white shadow-md`}>
+                      <div
+                        className={`inline-flex p-2 rounded-xl ${card.bg} ${card.text} mb-2`}
+                      >
+                        <card.icon className="w-4 h-4" />
+                      </div>
+                      <div className="text-2xl font-bold font-display text-slate-900">
+                        {card.value}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {card.label}
+                      </div>
                     </div>
-                    <div className="text-2xl font-bold font-display text-slate-900">
-                      {card.value}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {card.label}
-                    </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
