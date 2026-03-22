@@ -102,7 +102,7 @@ export default function EditFollowupModal({
         throw new Error(data.error || "Failed to delete followup member");
       }
 
-      toast.success("Followup member deleted successfully");
+    //   toast.success("Followup member deleted successfully");
       onDelete?.(form.id);
       onClose();
     } catch (err) {
