@@ -230,7 +230,7 @@ export default function AdminDashboardPage() {
                     link: "/dashboard/admin/leads",
                   },
                   {
-                    label: "Evangelists",
+                    label: "Total Evangelists",
                     icon: Users,
                     value: stats?.evangelists ?? 0,
                     bg: "bg-purple-50",
@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
                     link: "/dashboard/admin/evangelists",
                   },
                   {
-                    label: "Follow-Up",
+                    label: "TotalFollow-Up",
                     icon: UserCheck,
                     value: stats?.followups ?? 0,
                     bg: "bg-blue-50",
@@ -281,7 +281,7 @@ export default function AdminDashboardPage() {
                     border: "border-sky-200",
                   },
                   {
-                    label: "Lukewarm",
+                    label: "Lukewarm Leads",
                     icon: Thermometer,
                     value: stats?.attendance?.lukewarm ?? 0,
                     bg: "bg-yellow-50",
