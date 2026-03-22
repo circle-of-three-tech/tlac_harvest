@@ -180,7 +180,7 @@ export default function EditFollowupModal({
                 className="harvest-select"
               >
                 <option value="FOLLOWUP">Followup</option>
-                <option value="LEAD">Lead</option>
+                <option value="EVANGELIST">Evangelist</option>
               </select>
             </div>
   

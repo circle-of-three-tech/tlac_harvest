@@ -183,10 +183,10 @@ export default function EditEvangelistModal({
                 className="harvest-select"
               >
                 <option value="FOLLOWUP">Followup</option>
-                <option value="LEAD">Lead</option>
+                <option value="EVANGELIST">Evangelist</option>
               </select>
             </div>
-            
+
             <div>
               <label className="harvest-label">Gender</label>
               <select
