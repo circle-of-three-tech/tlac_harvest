@@ -482,7 +482,24 @@ export async function clearAllCachedData(): Promise<void> {
 
 // ─── Transform helpers ────────────────────────────────────────────────────────
 
-export function transformCachedLeadToLead(cachedLead: CachedLead): Record<string, unknown> {
+/** Typed shape expected by LeadTable and other lead-consuming components. */
+export interface TransformedLead {
+  id: string;
+  fullName: string;
+  location: string;
+  soulState: string;
+  status: string;
+  ageRange: string;
+  phone?: string;
+  address?: string;
+  additionalNotes?: string;
+  gender?: string;
+  createdByName?: string;
+  assignedTo?: string;
+  createdAt: string;
+}
+
+export function transformCachedLeadToLead(cachedLead: CachedLead): TransformedLead {
   return {
     id: cachedLead._id,
     fullName: cachedLead.fullName,
