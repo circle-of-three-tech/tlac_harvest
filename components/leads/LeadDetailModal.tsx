@@ -116,7 +116,7 @@ export default function LeadDetailModal({
 
   const att = getAttendanceStatus(lead.monthsConsistent ?? 0);
 
-  console.log({"phone": lead})
+  // console.log({"phone": lead})
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">

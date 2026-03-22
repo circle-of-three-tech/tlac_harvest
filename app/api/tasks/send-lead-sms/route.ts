@@ -1,117 +1,101 @@
-export async function generateStaticParams() {
-  return [];
+// app/api/tasks/send-lead-sms/route.ts
+//
+// Sends a NEW_LEAD_NOTIFICATION SMS to leads approximately 1 hour after creation.
+// Only fires for leads that have a phone number and haven't already received
+// this SMS type (idempotent — safe to call more than once).
+//
+// Trigger via Vercel Cron (vercel.json) or an external scheduler.
+// Auth: set CRON_SECRET in env and pass as: Authorization: Bearer <secret>
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { SMSType } from '@prisma/client';
+import { sendSMS, getSMSTemplate, renderTemplate } from '@/lib/sms';
+
+const WINDOW_MINUTES = 5; // ± buffer around the 1-hour mark
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+function isAuthorized(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return true;
+  return req.headers.get('authorization') === `Bearer ${cronSecret}`;
 }
 
-// app/api/tasks/send-lead-sms/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { SMSType } from "@prisma/client";
-import { sendSMS, getSMSTemplate, renderTemplate } from "@/lib/sms";
+// ─── Core logic ───────────────────────────────────────────────────────────────
 
-/**
- * Cron endpoint to send SMS to leads 1 hour after creation
- * Should be called via a cron service like Vercel Cron or external scheduler
- * 
- * Usage: GET /api/tasks/send-lead-sms
- */
+async function sendLeadSMS() {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const windowMs = WINDOW_MINUTES * 60 * 1000;
+
+  const leadsToNotify = await prisma.lead.findMany({
+    where: {
+      createdAt: {
+        gte: new Date(oneHourAgo.getTime() - windowMs),
+        lte: new Date(oneHourAgo.getTime() + windowMs),
+      },
+      phone: { not: null },
+      // Idempotency: skip leads that already received this SMS type
+      smsLogs: { none: { type: SMSType.NEW_LEAD_NOTIFICATION } },
+    },
+    select: {
+      id: true,
+      fullName: true,
+      phone: true,
+      location: true,
+    },
+  });
+
+  if (leadsToNotify.length === 0) {
+    return NextResponse.json({ success: true, message: 'No leads to notify', count: 0 });
+  }
+
+  const template = await getSMSTemplate(SMSType.NEW_LEAD_NOTIFICATION);
+
+  const results = await Promise.all(
+    leadsToNotify.map(async (lead) => {
+      try {
+        const message = renderTemplate(template, {
+          leadName: lead.fullName,
+          location: lead.location,
+        });
+
+        const result = await sendSMS({
+          phone: lead.phone!,
+          message,
+          type: SMSType.NEW_LEAD_NOTIFICATION,
+          leadId: lead.id,
+        });
+
+        return { leadId: lead.id, success: result.success };
+      } catch (err) {
+        console.error(`[send-lead-sms] Failed for lead ${lead.id}:`, err);
+        return { leadId: lead.id, success: false };
+      }
+    })
+  );
+
+  const successCount = results.filter((r) => r.success).length;
+
+  return NextResponse.json({
+    success: true,
+    sent: successCount,
+    failed: results.length - successCount,
+    total: leadsToNotify.length,
+  });
+}
+
+// ─── Route handler ────────────────────────────────────────────────────────────
+
 export async function GET(req: NextRequest) {
-  // Optional: Add security check with cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // Calculate timestamp for 1 hour ago
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    
-    // Find leads created around 1 hour ago that haven't been sent the NEW_LEAD_NOTIFICATION SMS yet
-    const leadsToNotify = await prisma.lead.findMany({
-      where: {
-        createdAt: {
-          gte: new Date(oneHourAgo.getTime() - 5 * 60 * 1000), // 5 min buffer
-          lte: new Date(oneHourAgo.getTime() + 5 * 60 * 1000), // 5 min buffer
-        },
-        phone: {
-          not: null,
-        },
-        smsLogs: {
-          none: {
-            type: SMSType.NEW_LEAD_NOTIFICATION,
-          },
-        },
-      },
-      include: {
-        smsLogs: {
-          where: { type: SMSType.NEW_LEAD_NOTIFICATION },
-        },
-      },
-    });
-
-    if (leadsToNotify.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: "No leads to notify",
-        count: 0,
-      });
-    }
-
-    // Get the template
-    const template = await getSMSTemplate(SMSType.NEW_LEAD_NOTIFICATION);
-
-    // Send SMS to each lead
-    const results = await Promise.all(
-      leadsToNotify.map(async (lead) => {
-        try {
-          const data = {
-            leadName: lead.fullName,
-            location: lead.location,
-          };
-
-          const message = renderTemplate(template, data);
-
-          const result = await sendSMS({
-            phone: lead.phone!,
-            message,
-            type: SMSType.NEW_LEAD_NOTIFICATION,
-            leadId: lead.id,
-          });
-
-          return {
-            leadId: lead.id,
-            leadName: lead.fullName,
-            success: result.success,
-            error: result.error,
-          };
-        } catch (error) {
-          console.error(`Error sending SMS to lead ${lead.id}:`, error);
-          return {
-            leadId: lead.id,
-            leadName: lead.fullName,
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-          };
-        }
-      })
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: `Sent SMS notifications to ${results.filter(r => r.success).length} leads`,
-      count: leadsToNotify.length,
-      results,
-    });
-  } catch (error) {
-    console.error("Error in send-lead-sms cron:", error);
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return await sendLeadSMS();
+  } catch (err) {
+    console.error('[send-lead-sms] Unhandled error:', err);
+    return NextResponse.json({ error: 'Failed to send lead SMS' }, { status: 500 });
   }
 }
