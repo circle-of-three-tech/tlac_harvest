@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
     // Fire side-effects in the background — never delay the response.
     void sendAdminAlerts(lead);
 
-    return NextResponse.json({ id: lead.id, ...lead }, { status: 201 });
+    return NextResponse.json(lead, { status: 201 });
   } catch (error) {
     console.error('POST /api/leads error:', error);
     return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
