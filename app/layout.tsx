@@ -21,9 +21,10 @@ export const metadata: Metadata = {
     icon: '/favicon.ico',
     apple: '/icons/icon-192x192.png',
   },
+  // Note: appleWebApp.capable intentionally omitted — it generates the
+  // deprecated <meta name="apple-mobile-web-app-capable"> tag. PWA install
+  // behaviour is controlled by the manifest and the Viewport export instead.
   appleWebApp: {
-    capable: true,
-    // Valid values: 'default' | 'black' | 'black-translucent'
     statusBarStyle: 'black-translucent',
     title: 'TLAC Harvest',
   },
@@ -40,6 +41,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {/* Standard PWA capability meta (replaces deprecated apple-mobile-web-app-capable) */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        {/* Standards-compliant PWA capable tag (suppresses deprecation warning) */}
+        <meta name="mobile-web-app-capable" content="yes" />
         {/* iOS PWA splash screens */}
         <link
           rel="apple-touch-startup-image"

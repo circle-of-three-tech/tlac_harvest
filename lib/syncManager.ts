@@ -95,10 +95,13 @@ async function verifyNetworkConnectivity(): Promise<boolean> {
   // Guard: can't run fetch on the server during SSR
   if (typeof window === 'undefined') return true;
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(new DOMException('Health check timed out', 'TimeoutError')),
+    10000
+  );
 
+  try {
     // Use cache: 'no-store' so a cached response doesn't mask real offline state.
     const response = await fetch('/api/health', {
       method: 'HEAD',
@@ -107,12 +110,33 @@ async function verifyNetworkConnectivity(): Promise<boolean> {
     });
 
     clearTimeout(timeoutId);
-    // Any response, even 500 (database down), means network is working.
-    // Only thrown errors (network failure) mean we're truly offline.
+    // Any HTTP response (even 500) means the network stack is working.
     console.log(`Health check: ${response.status} - Network is up`);
     return true;
   } catch (error) {
-    // AbortError = timeout, TypeError = no network — both mean offline.
+    clearTimeout(timeoutId);
+
+    // A timeout (AbortError/TimeoutError) means the server was slow — we
+    // cannot conclude the device is offline. Preserve the previous online
+    // state by returning true so we don't trigger a spurious disconnection.
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      console.warn('Health check timed out — assuming online');
+      return true;
+    }
+
+    // AbortError without our explicit reason means something else aborted
+    // the request (e.g. page navigation). Also treat as non-offline.
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      const isOurAbort =
+        error.message === 'Health check timed out' ||
+        error.message === '';
+      if (!isOurAbort) return true;
+      // Our own timeout abort — treat same as TimeoutError above.
+      console.warn('Health check aborted (timeout) — assuming online');
+      return true;
+    }
+
+    // TypeError means the request never left the device (no network).
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.log(`Health check failed: ${errorMsg} - Network appears down`);
     return false;
