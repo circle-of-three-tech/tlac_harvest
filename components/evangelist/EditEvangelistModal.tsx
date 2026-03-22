@@ -14,6 +14,7 @@ interface Evangelist {
   email: string;
   phone?: string;
   gender?: string;
+  role: string;
   noOfSoulsTarget?: number;
 }
 
@@ -35,10 +36,11 @@ export default function EditEvangelistModal({
       id: "",
       name: "",
       email: "",
+      role: "EVANGELIST",
       phone: "",
       gender: "",
       noOfSoulsTarget: 0,
-    }
+    },
   );
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -67,6 +69,7 @@ export default function EditEvangelistModal({
           name: form.name,
           email: form.email,
           phone: form.phone,
+          role: form.role,
           gender: form.gender || null,
           noOfSoulsTarget: form.noOfSoulsTarget,
         }),
@@ -81,7 +84,8 @@ export default function EditEvangelistModal({
       onSuccess(updatedEvangelist);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to update evangelist";
+      const message =
+        err instanceof Error ? err.message : "Failed to update evangelist";
       setError(message);
     } finally {
       setLoading(false);
@@ -102,11 +106,11 @@ export default function EditEvangelistModal({
         throw new Error(data.error || "Failed to delete evangelist");
       }
 
-
       onDelete?.(form.id);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to delete evangelist";
+      const message =
+        err instanceof Error ? err.message : "Failed to delete evangelist";
       setError(message);
     } finally {
       setDeleting(false);
@@ -131,7 +135,10 @@ export default function EditEvangelistModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="p-4 sm:p-6 space-y-4 sm:space-y-5"
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="col-span-1 sm:col-span-2">
               <label className="harvest-label">Full Name *</label>
@@ -168,6 +175,18 @@ export default function EditEvangelistModal({
               />
             </div>
 
+            <div className="col-span-1 sm:col-span-2">
+              <label className="harvest-label">Role</label>
+              <select
+                value={form.role || ""}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="harvest-select"
+              >
+                <option value="FOLLOWUP">Followup</option>
+                <option value="LEAD">Lead</option>
+              </select>
+            </div>
+            
             <div>
               <label className="harvest-label">Gender</label>
               <select
@@ -190,7 +209,10 @@ export default function EditEvangelistModal({
                 min="0"
                 value={form.noOfSoulsTarget || 0}
                 onChange={(e) =>
-                  setForm({ ...form, noOfSoulsTarget: parseInt(e.target.value) })
+                  setForm({
+                    ...form,
+                    noOfSoulsTarget: parseInt(e.target.value),
+                  })
                 }
                 placeholder="0"
                 className="harvest-input"
@@ -211,7 +233,8 @@ export default function EditEvangelistModal({
                 Permanently delete this evangelist?
               </p>
               <p className="text-red-700 text-xs sm:text-sm mb-3">
-                This action cannot be undone. Make sure they don't have any assigned leads.
+                This action cannot be undone. Make sure they don't have any
+                assigned leads.
               </p>
               <div className="flex gap-2">
                 <button

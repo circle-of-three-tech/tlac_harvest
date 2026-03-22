@@ -14,6 +14,7 @@ interface FollowupMember {
   email: string;
   phone?: string;
   gender?: string;
+  role: string;
   noOfSoulsTarget?: number;
 }
 
@@ -36,6 +37,7 @@ export default function EditFollowupModal({
       name: "",
       email: "",
       phone: "",
+      role: "FOLLOWUP",
       gender: "",
       noOfSoulsTarget: 0,
     }
@@ -67,6 +69,7 @@ export default function EditFollowupModal({
           name: form.name,
           email: form.email,
           phone: form.phone,
+          role: form.role,
           gender: form.gender || null,
           noOfSoulsTarget: form.noOfSoulsTarget,
         }),
@@ -167,6 +170,20 @@ export default function EditFollowupModal({
                 className="harvest-input"
               />
             </div>
+
+
+            <div className="col-span-1 sm:col-span-2">
+              <label className="harvest-label">Role</label>
+              <select   
+                value={form.role || ""}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="harvest-select"
+              >
+                <option value="FOLLOWUP">Followup</option>
+                <option value="LEAD">Lead</option>
+              </select>
+            </div>
+  
 
             <div>
               <label className="harvest-label">Gender</label>
