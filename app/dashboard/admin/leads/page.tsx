@@ -1,7 +1,7 @@
 // app/dashboard/admin/leads/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { Search, Filter, ChevronDown, ChevronRight, UserRoundPlus } from "lucide-react";
+import { Filter, ChevronDown, ChevronRight, UserRoundPlus } from "lucide-react";
 import LeadTable from "@/components/leads/LeadTable";
 import { LEAD_STATUS_LABELS, SOUL_STATE_LABELS } from "@/lib/utils";
 import AddLeadModal from "@/components/leads/AddLeadModal";
@@ -75,7 +75,7 @@ export default function AdminLeadsPage() {
               onClick={() => setIsFilterOpen((prev) => !prev)}
               className={`w-full flex sm:justify-between md:justify-start text-white bg-harvest-500 py-2 px-4 rounded-xl `}
             >
-              Filters {isFilterOpen ? <ChevronDown /> : <ChevronRight />}{" "}
+              <span className="flex items-center gap-4 w-fit"> <Filter size={14}/> Filter{" "}</span> {isFilterOpen ? <ChevronDown /> : <ChevronRight />}{" "}
             </button>
           </div>
           {/* fields */}

@@ -146,7 +146,7 @@ export default function AdminDashboardPage() {
               onClick={() => setIsFilterOpen((prev) => !prev)}
               className="w-full flex justify-between text-white bg-harvest-500 py-2 px-4 rounded-xl"
             >
-              <Filter /> Date Filter{" "}
+             <span className="flex items-center gap-4 w-fit"> <Filter size={14}/> Date Filter{" "}</span>
               {isFilterOpen ? <ChevronDown /> : <ChevronRight />}{" "}
             </button>
           </div>
