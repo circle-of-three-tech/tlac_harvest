@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
+import { Edit2 } from "lucide-react";
 import LeadsModal from "./LeadsModal";
+import EditFollowupModal from "./EditFollowupModal";
 
-const FollowupTable = ({ followups }: { followups: any[] }) => {
+const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) => {
+    const [followups, setFollowups] = useState(initialFollowups);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingFollowup, setEditingFollowup] = useState<any>(null);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     const openLeadsModal = (user: any) => {
       setSelectedUser(user);
@@ -16,6 +21,27 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
     const closeLeadsModal = () => {
       setIsModalOpen(false);
       setSelectedUser(null);
+    };
+
+    const openEditModal = (e: React.MouseEvent, user: any) => {
+      e.stopPropagation();
+      setEditingFollowup(user);
+      setShowEditModal(true);
+    };
+
+    const closeEditModal = () => {
+      setShowEditModal(false);
+      setEditingFollowup(null);
+    };
+
+    const handleEditSuccess = (updatedFollowup: any) => {
+      // Update the followup in the list
+      setFollowups(followups.map(f => f.id === updatedFollowup.id ? updatedFollowup : f));
+    };
+
+    const handleDeleteSuccess = (deletedId: string) => {
+      // Remove the followup from the list
+      setFollowups(followups.filter(f => f.id !== deletedId));
     };
 
     return (
@@ -30,16 +56,19 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
                 <th>Phone</th>
                 <th>Assigned Leads</th>
                 <th>Joined</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {followups.map(user => (
                 <tr 
                   key={user.id}
-                  onClick={() => openLeadsModal(user)}
-                  className="cursor-pointer hover:bg-blue-50 transition"
+                  className="hover:bg-blue-50 transition"
                 >
-                  <td>
+                  <td
+                    onClick={() => openLeadsModal(user)}
+                    className="cursor-pointer"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
                         {user.name[0]}
@@ -47,14 +76,23 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
                       <span className="font-medium text-slate-900">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</span>
                     </div>
                   </td>
-                  <td className="text-slate-600">{user.email}</td>
-                  <td className="text-slate-600">{user.phone}</td>
-                  <td>
+                  <td onClick={() => openLeadsModal(user)} className="text-slate-600 cursor-pointer">{user.email}</td>
+                  <td onClick={() => openLeadsModal(user)} className="text-slate-600 cursor-pointer">{user.phone}</td>
+                  <td onClick={() => openLeadsModal(user)} className="cursor-pointer">
                     <span className="badge bg-blue-100 text-blue-700">
                       {user._count?.assignedLeads ?? 0} leads
                     </span>
                   </td>
-                  <td className="text-slate-400 text-sm">{format(new Date(user.createdAt), "MMM d, yyyy")}</td>
+                  <td onClick={() => openLeadsModal(user)} className="text-slate-400 text-sm cursor-pointer">{format(new Date(user.createdAt), "MMM d, yyyy")}</td>
+                  <td>
+                    <button
+                      onClick={(e) => openEditModal(e, user)}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-100 transition text-sm font-medium"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -66,11 +104,13 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
           {followups.map((user) => (
             <div
               key={user.id}
-              onClick={() => openLeadsModal(user)}
-              className="p-4 bg-white shadow-md hover:shadow-lg border border-blue-100 rounded-xl transition-colors cursor-pointer"
+              className="p-4 bg-white shadow-md hover:shadow-lg border border-blue-100 rounded-xl transition-colors"
             >
               <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3 flex-1">
+                <div
+                  onClick={() => openLeadsModal(user)}
+                  className="flex items-center gap-3 flex-1 cursor-pointer"
+                >
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
                     {user.name[0]}
                   </div>
@@ -79,16 +119,22 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
                     <div className="text-xs text-slate-400 truncate">{user.email}</div>
                   </div>
                 </div>
+                <button
+                  onClick={(e) => openEditModal(e, user)}
+                  className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-100 transition"
+                >
+                  <Edit2 className="w-4 h-4 text-blue-700" />
+                </button>
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
+                <div className="flex justify-between cursor-pointer" onClick={() => openLeadsModal(user)}>
                   <span className="text-slate-500">Assigned Leads</span>
                   <span className="badge bg-blue-100 text-blue-700">
                     {user._count?.assignedLeads ?? 0} leads
                   </span>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-blue-100">
+                <div className="flex justify-between pt-2 border-t border-blue-100 cursor-pointer" onClick={() => openLeadsModal(user)}>
                   <span className="text-slate-500">Joined</span>
                   <span className="text-slate-400 text-xs">{format(new Date(user.createdAt), "MMM d, yyyy")}</span>
                 </div>
@@ -102,6 +148,15 @@ const FollowupTable = ({ followups }: { followups: any[] }) => {
           user={selectedUser}
           isOpen={isModalOpen}
           onClose={closeLeadsModal}
+        />
+
+        {/* Edit Followup Modal */}
+        <EditFollowupModal
+          isOpen={showEditModal}
+          onClose={closeEditModal}
+          followupMember={editingFollowup}
+          onSuccess={handleEditSuccess}
+          onDelete={handleDeleteSuccess}
         />
       </>
     )
