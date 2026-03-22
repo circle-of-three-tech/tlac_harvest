@@ -85,9 +85,24 @@ async function sendLeadSMS() {
   });
 }
 
-// ─── Route handler ────────────────────────────────────────────────────────────
+// ─── Route handlers ───────────────────────────────────────────────────────
 
+/** GET — for Vercel Cron Jobs */
 export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    return await sendLeadSMS();
+  } catch (err) {
+    console.error('[send-lead-sms] Unhandled error:', err);
+    return NextResponse.json({ error: 'Failed to send lead SMS' }, { status: 500 });
+  }
+}
+
+/** POST — for external cron services (cron-job.org, EasyCron, etc) */
+export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
