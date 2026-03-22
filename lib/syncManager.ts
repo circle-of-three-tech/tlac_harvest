@@ -612,11 +612,47 @@ export async function refreshCachedData(): Promise<void> {
  * the _id field is always populated and cacheLeads() doesn't silently skip
  * every record.
  */
+// ─── Cache-fetch helper ───────────────────────────────────────────────────────
+
+/**
+ * Fetch a URL with a generous timeout and one automatic retry on timeout.
+ *
+ * Why: Vercel serverless functions on the free/hobby tier have cold-start
+ * times that regularly exceed 10 s, especially when Prisma needs to open a
+ * new connection pool. Using AbortSignal.timeout(10000) caused every cache
+ * refresh on a cold start to fail with TimeoutError, leaving the client with
+ * no cached data even though the network was perfectly healthy.
+ *
+ * Policy:
+ *  - First attempt: 25 s timeout (covers typical cold starts)
+ *  - On TimeoutError: one retry with a fresh 30 s timeout
+ *  - Any other error (TypeError = no network, non-2xx): throw immediately
+ */
+async function fetchWithRetry(url: string, attempt = 1): Promise<Response> {
+  const TIMEOUT_MS = attempt === 1 ? 25_000 : 30_000;
+
+  try {
+    return await fetch(url, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: 'no-store',
+    });
+  } catch (err) {
+    const isTimeout =
+      err instanceof DOMException &&
+      (err.name === 'TimeoutError' || err.name === 'AbortError');
+
+    if (isTimeout && attempt === 1) {
+      console.warn(`[SyncManager] ${url} timed out — retrying once...`);
+      return fetchWithRetry(url, 2);
+    }
+
+    throw err;
+  }
+}
+
 export async function loadCachedLeads(): Promise<void> {
   try {
-    const response = await fetch('/api/leads?limit=1000', {
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry('/api/leads?limit=1000');
 
     if (!response.ok) {
       throw new Error(`Failed to load leads: ${response.status}`);
@@ -653,9 +689,7 @@ export async function loadCachedLeads(): Promise<void> {
  */
 export async function loadCachedUsers(): Promise<void> {
   try {
-    const response = await fetch('/api/users?limit=500', {
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry('/api/users?limit=500');
 
     if (!response.ok) {
       throw new Error(`Failed to load users: ${response.status}`);
@@ -684,9 +718,7 @@ export async function loadCachedUsers(): Promise<void> {
  */
 export async function loadCachedAnnouncements(): Promise<void> {
   try {
-    const response = await fetch('/api/announcements/active', {
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry('/api/announcements/active');
 
     if (!response.ok) {
       throw new Error(`Failed to load announcements: ${response.status}`);
@@ -716,9 +748,7 @@ export async function loadCachedAnnouncements(): Promise<void> {
  */
 export async function loadCachedStats(): Promise<void> {
   try {
-    const response = await fetch('/api/admin/stats', {
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry('/api/admin/stats');
 
     if (!response.ok) {
       throw new Error(`Failed to load stats: ${response.status}`);
@@ -738,9 +768,7 @@ export async function loadCachedStats(): Promise<void> {
  */
 export async function loadCachedActivityLogs(): Promise<void> {
   try {
-    const response = await fetch('/api/admin/activity-log?limit=100', {
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry('/api/admin/activity-log?limit=100');
 
     if (!response.ok) {
       throw new Error(`Failed to load activity logs: ${response.status}`);
@@ -769,9 +797,7 @@ export async function loadCachedActivityLogs(): Promise<void> {
  */
 export async function loadCachedSMSLogs(): Promise<void> {
   try {
-    const response = await fetch('/api/admin/sms-logs?limit=100', {
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry('/api/admin/sms-logs?limit=100');
 
     if (!response.ok) {
       throw new Error(`Failed to load SMS logs: ${response.status}`);
