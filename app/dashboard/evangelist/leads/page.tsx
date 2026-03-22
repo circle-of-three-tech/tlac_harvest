@@ -14,7 +14,7 @@ export default function EvangelistLeadsPage() {
   const [page, setPage] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
   const [search, setSearch] = useState("");
-  const { data: allLeads, loading, error, isOffline } = useLeadsData();
+  const { data: allLeads, loading, error, isOffline, refetch } = useLeadsData();
   const { isOnline } = useSync();
 
   // Filter leads content-wise
@@ -129,7 +129,8 @@ export default function EvangelistLeadsPage() {
           onClose={() => setShowAddModal(false)}
           onSuccess={(newLead) => {
             setShowAddModal(false);
-            // Leads will be updated on sync or cache refresh
+            setPage(1);
+            refetch();
           }}
         />
       )}

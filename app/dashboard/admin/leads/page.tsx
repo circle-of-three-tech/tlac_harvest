@@ -34,8 +34,9 @@ export default function AdminLeadsPage() {
     setLoading(false);
   };
   const handleLeadAdded = (newLead: any) => {
-    setLeads((prev) => [newLead, ...prev]);
     setShowAddModal(false);
+    setPage(1);
+    fetchLeads();
   };
 
   useEffect(() => {
