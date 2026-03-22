@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CircleX, X, AlertCircle, Save, Trash2 } from "lucide-react";
 
 const GENDER_OPTIONS = [
@@ -46,7 +46,7 @@ export default function EditEvangelistModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Update form when evangelist prop changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (evangelist && isOpen) {
       setForm(evangelist);
       setError("");
