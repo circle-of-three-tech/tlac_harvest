@@ -495,7 +495,8 @@ export interface TransformedLead {
   additionalNotes?: string;
   gender?: string;
   createdByName?: string;
-  assignedTo?: string;
+  assignedTo?: { id: string; name: string } | null;
+  addedBy?: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -512,7 +513,8 @@ export function transformCachedLeadToLead(cachedLead: CachedLead): TransformedLe
     additionalNotes: cachedLead.additionalNotes,
     gender: cachedLead.gender,
     createdByName: cachedLead.createdByName,
-    assignedTo: cachedLead.assignedTo,
+    assignedTo: cachedLead.assignedTo ? { id: cachedLead.assignedTo, name: cachedLead.createdByName || 'Unknown' } : null,
+    addedBy: cachedLead.createdByName ? { id: cachedLead._id, name: cachedLead.createdByName } : null,
     createdAt: new Date(cachedLead.cachedAt).toISOString(),
   };
 }
