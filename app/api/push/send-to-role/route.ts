@@ -1,98 +1,52 @@
-export async function generateStaticParams() {
-  return [];
-}
-
-// POST /api/push/send-to-role
-// Send push notifications to all users with a specific role
-// This is used for announcements and system-wide notifications
+// app/api/push/send-to-role/route.ts
+// POST — send a push notification to all users with a specific role.
+// Admin-only.
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { sendPushToRole, configureWebPush } from '@/lib/push';
+import { z } from 'zod';
 
-interface SendToRoleRequest {
-  role: 'EVANGELIST' | 'FOLLOWUP' | 'ADMIN';
-  title: string;
-  body: string;
-  icon?: string;
-  badge?: string;
-  tag?: string;
-  data?: {
-    url?: string;
-    [key: string]: any;
-  };
-}
+const schema = z.object({
+  role: z.enum(['EVANGELIST', 'FOLLOWUP', 'ADMIN']),
+  title: z.string().min(1),
+  body: z.string().min(1),
+  icon: z.string().optional(),
+  badge: z.string().optional(),
+  tag: z.string().optional(),
+  data: z.record(z.unknown()).optional(),
+});
 
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins can send notifications to roles
     if (session.user.role !== 'ADMIN') {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const payload: SendToRoleRequest = await req.json();
-
-    // Validate required fields
-    if (!payload.role || !payload.title || !payload.body) {
+    const parsed = schema.safeParse(await req.json());
+    if (!parsed.success) {
       return Response.json(
-        { error: 'Missing required fields: role, title, body' },
-        { status: 400 }
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 422 }
       );
     }
 
-    // Validate role
-    const validRoles = ['EVANGELIST', 'FOLLOWUP', 'ADMIN'];
-    if (!validRoles.includes(payload.role)) {
-      return Response.json(
-        { error: 'Invalid role. Must be one of: EVANGELIST, FOLLOWUP, ADMIN' },
-        { status: 400 }
-      );
+    if (!configureWebPush()) {
+      return Response.json({ error: 'Push notifications not configured' }, { status: 503 });
     }
 
-    // Configure web push if not already done
-    const configured = configureWebPush();
-    if (!configured) {
-      return Response.json(
-        { error: 'Push notifications not configured' },
-        { status: 503 }
-      );
-    }
+    const { role, ...payload } = parsed.data;
+    const result = await sendPushToRole(role, payload);
 
-    // Send notification to role
-    const result = await sendPushToRole(
-      payload.role,
-      {
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon,
-        badge: payload.badge,
-        tag: payload.tag,
-        data: payload.data,
-      },
-      prisma
-    );
-
-    return Response.json(
-      {
-        success: true,
-        sent: result.sent,
-        failed: result.failed,
-        skipped: result.skipped,
-      },
-      { status: 200 }
-    );
+    return Response.json({ success: true, sent: result.sent, failed: result.failed, stale: result.stale });
   } catch (error) {
-    console.error('Push send to role error:', error);
-    return Response.json(
-      { error: 'Failed to send push notifications' },
-      { status: 500 }
-    );
+    console.error('[push/send-to-role] Error:', error);
+    return Response.json({ error: 'Failed to send push notifications' }, { status: 500 });
   }
 }
