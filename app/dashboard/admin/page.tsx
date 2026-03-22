@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
                     link: "/dashboard/admin/evangelists",
                   },
                   {
-                    label: "TotalFollow-Up",
+                    label: "Total Follow-Up",
                     icon: UserCheck,
                     value: stats?.followups ?? 0,
                     bg: "bg-blue-50",
