@@ -4,6 +4,16 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ChevronDown, ChevronLeft, ChevronRight, NotepadText, X, Pin } from 'lucide-react';
 
+interface Note {
+  id: string;
+  content: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+  };
+}
+
 interface Lead {
   id: string;
   fullName: string;
@@ -14,8 +24,8 @@ interface Lead {
   churchMembership: string;
   monthsConsistent: number;
   createdAt: string;
-  followUpNotes?: string;
   additionalNotes?: string;
+  notes: Note[];
 }
 
 interface AddedLeadsModalProps {
@@ -179,56 +189,52 @@ const AddedLeadsModal = ({ user, isOpen, onClose }: AddedLeadsModalProps) => {
                       </p>
 
                       {/* Notes Section */}
-                      {(lead.followUpNotes || lead.additionalNotes) && (
+                      {lead.notes && lead.notes.length > 0 && (
                         <div className="mt-4 border-t pt-3">
-                          {lead.followUpNotes && (
-                            <div className="mb-3">
-                              <button
-                                onClick={() =>
-                                  setExpandedLeadId(
-                                    expandedLeadId === lead.id ? null : lead.id
-                                  )
-                                }
-                                className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
-                              >
-                                <span className='flex items-center gap-2'><NotepadText size={12}/> Follow-up Notes</span>
-                                <span className="text-xs">
-                                  {expandedLeadId === lead.id ? <ChevronDown size={12} />: <ChevronRight size={12} />}
-                                </span>
-                              </button>
-                              {expandedLeadId === lead.id && (
-                                <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border border-slate-200">
-                                  {lead.followUpNotes}
-                                </p>
-                              )}
+                          <button
+                            onClick={() =>
+                              setExpandedLeadId(
+                                expandedLeadId === lead.id ? null : lead.id
+                              )
+                            }
+                            className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
+                          >
+                            <span className='flex items-center gap-2'>
+                              <NotepadText size={12} /> Notes ({lead.notes.length})
+                            </span>
+                            <span className="text-xs">
+                              {expandedLeadId === lead.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            </span>
+                          </button>
+                          {expandedLeadId === lead.id && (
+                            <div className="mt-2 space-y-2">
+                              {lead.notes.map((note) => (
+                                <div key={note.id} className="bg-white p-2 rounded border border-slate-200">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-medium text-slate-600">
+                                      {note.user.name}
+                                    </span>
+                                    <span className="text-xs text-slate-400">
+                                      {format(new Date(note.createdAt), 'MMM d, yyyy HH:mm')}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-600 whitespace-pre-wrap">
+                                    {note.content}
+                                  </p>
+                                </div>
+                              ))}
                             </div>
                           )}
-                          {lead.additionalNotes && (
-                            <div>
-                              <button
-                                onClick={() =>
-                                  setExpandedLeadId(
-                                    expandedLeadId === `${lead.id}-additional`
-                                      ? null
-                                      : `${lead.id}-additional`
-                                  )
-                                }
-                                className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition"
-                              >
-                                <span className='flex items-center gap-2'><Pin size={12}/> Additional Notes</span>
-                                <span className="text-xs">
-                                  {expandedLeadId === `${lead.id}-additional`
-                                    ? <ChevronDown size={12} />
-                                    : <ChevronRight size={12} />}
-                                </span>
-                              </button>
-                              {expandedLeadId === `${lead.id}-additional` && (
-                                <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border border-slate-200">
-                                  {lead.additionalNotes}
-                                </p>
-                              )}
-                            </div>
-                          )}
+                        </div>
+                      )}
+                      {lead.additionalNotes && (
+                        <div className="mt-3">
+                          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                            <Pin size={12} /> Additional Notes
+                          </div>
+                          <p className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border border-slate-200">
+                            {lead.additionalNotes}
+                          </p>
                         </div>
                       )}
                     </div>
