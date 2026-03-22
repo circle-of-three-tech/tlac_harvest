@@ -159,11 +159,11 @@ export async function getSMSTemplate(type: SMSType): Promise<string> {
 function getDefaultTemplate(type: SMSType): string {
   const defaults: Record<SMSType, string> = {
     NEW_LEAD_NOTIFICATION:
-      'Hi {leadName}, welcome to Harvest! We're excited to have you on our journey.',
+      `Hi {leadName}, welcome to Harvest! We're excited to have you on our journey.`,
     ADMIN_ALERT:
-      'New lead: {leadName} ({phone}) from {location}. Status: {status}',
+      `New lead: {leadName} ({phone}) from {location}. Status: {status}`,
     FOLLOWUP_ASSIGNMENT:
-      'Hi {assigneeName}, a new lead has been assigned to you: {leadName} from {location}. Phone: {phone}',
+      `Hi {assigneeName}, a new lead has been assigned to you: {leadName} from {location}. Phone: {phone}`,
   };
   return defaults[type];
 }
