@@ -97,7 +97,7 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
              <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Role
+               Select Your Role
               </label>
               <div className="grid grid-cols-2 gap-3">
                 {[
@@ -140,7 +140,7 @@ export default function SignupPage() {
                 })}
               </div>
             </div>
-            
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                 Full Name
@@ -274,7 +274,7 @@ export default function SignupPage() {
               </div>
             </div>
            
-
+<br/>
             {error && (
               <div className="bg-red-300/20 border border-red-400/30 rounded-xl px-4 py-3 flex items-center gap-2 text-red-500 text-sm">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
