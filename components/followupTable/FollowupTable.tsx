@@ -24,9 +24,9 @@ const FollowupTable = ({ followups: initialFollowups }: { followups: any[] }) =>
       setSelectedUser(null);
     };
 
-    const openEditModal = (e: React.MouseEvent, user: any) => {
+    const openEditModal = (e: React.MouseEvent, userId: string) => {
       e.stopPropagation();
-      setEditingFollowupId(user.id);
+      setEditingFollowupId(userId);
       setShowEditModal(true);
     };
 
