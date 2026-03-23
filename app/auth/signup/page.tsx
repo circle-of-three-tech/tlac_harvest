@@ -95,6 +95,52 @@ export default function SignupPage() {
 
         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-5">
+             <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Role
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {
+                    value: "EVANGELIST",
+                    label: "Evangelist (Harvester)",
+                    desc: "Add new leads",
+                    icon: Zap,
+                  },
+                  {
+                    value: "FOLLOWUP",
+                    label: "Follow-Up",
+                    desc: "Disciple leads",
+                    icon: HeartHandshake,
+                  },
+                ].map((opt) => {
+                  const RoleIcon = opt.icon;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({ ...f, role: opt.value }))
+                      }
+                      className={`rounded-xl p-3 text-left transition-all flex items-start gap-2 ${
+                        form.role === opt.value
+                          ? "bg-earth-100 text-earth-500"
+                          : "bg-white text-earth-500"
+                      }`}
+                    >
+                      <RoleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-semibold text-sm">{opt.label}</div>
+                        <div className="text-xs opacity-70 mt-0.5">
+                          {opt.desc}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                 Full Name
@@ -227,51 +273,7 @@ export default function SignupPage() {
                 </button>
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-white mb-1.5">
-                Role
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    value: "EVANGELIST",
-                    label: "Evangelist (Harvester)",
-                    desc: "Add new leads",
-                    icon: Zap,
-                  },
-                  {
-                    value: "FOLLOWUP",
-                    label: "Follow-Up",
-                    desc: "Disciple leads",
-                    icon: HeartHandshake,
-                  },
-                ].map((opt) => {
-                  const RoleIcon = opt.icon;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() =>
-                        setForm((f) => ({ ...f, role: opt.value }))
-                      }
-                      className={`rounded-xl p-3 text-left transition-all flex items-start gap-2 ${
-                        form.role === opt.value
-                          ? "bg-earth-100 text-earth-500"
-                          : "bg-white text-earth-500"
-                      }`}
-                    >
-                      <RoleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <div className="font-semibold text-sm">{opt.label}</div>
-                        <div className="text-xs opacity-70 mt-0.5">
-                          {opt.desc}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+           
 
             {error && (
               <div className="bg-red-300/20 border border-red-400/30 rounded-xl px-4 py-3 flex items-center gap-2 text-red-500 text-sm">
