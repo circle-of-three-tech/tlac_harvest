@@ -197,6 +197,7 @@ export default function EditFollowupModal({
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
                 className="harvest-select"
               >
+                <option value="ADMIN">Admin</option>
                 <option value="FOLLOWUP">Followup</option>
                 <option value="EVANGELIST">Evangelist</option>
               </select>
