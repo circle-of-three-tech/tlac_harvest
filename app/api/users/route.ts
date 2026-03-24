@@ -12,12 +12,12 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const role = searchParams.get("role");
+    const roles = searchParams.getAll("role");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
 
     const where: any = {};
-    if (role) where.role = role;
+    if (roles.length > 0) where.role = { in: roles };
 
     const skip = (page - 1) * limit;
 
