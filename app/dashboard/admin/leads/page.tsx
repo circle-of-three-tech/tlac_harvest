@@ -19,9 +19,9 @@ export default function AdminLeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (pageNum: number = page) => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: "15" });
+    const params = new URLSearchParams({ page: String(pageNum), limit: "15" });
     if (statusFilter) params.set("status", statusFilter);
     if (soulFilter) params.set("soulState", soulFilter);
     if (dateFrom) params.set("dateFrom", dateFrom);
@@ -36,7 +36,7 @@ export default function AdminLeadsPage() {
   const handleLeadAdded = (newLead: any) => {
     setShowAddModal(false);
     setPage(1);
-    fetchLeads();
+    fetchLeads(1); // Pass explicit page number to avoid state race condition
   };
 
   useEffect(() => {

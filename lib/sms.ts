@@ -172,6 +172,10 @@ function getDefaultTemplate(type: SMSType): string {
       `Hi {leadName}, welcome! We're excited to help you reconnect with your faith community.`,
     SOULSTATE_HUNGRY_BELIEVER:
       `Welcome, {leadName}! We're thrilled to journey with you as you grow deeper in Christ.`,
+    INACTIVITY_REMINDER_FOLLOWUP:
+      `Hi {name}, it's been {days} day{pluralS} since you last checked in. Your assigned leads need your attention! Log in to the TLAC Harvest app now.`,
+    INACTIVITY_REMINDER_EVANGELIST:
+      `Hi {name}, it's been {days} day{pluralS} since you added a lead. Help us reach more souls! Log in to the TLAC Harvest app now.`,
   };
   return defaults[type];
 }

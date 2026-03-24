@@ -1,6 +1,6 @@
 // app/dashboard/evangelist/EvangelistDashboardClient.tsx
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   UserRoundPlus,
@@ -36,13 +36,47 @@ export default function EvangelistDashboardClient({
   noOfSoulsTarget,
 }: Props) {
   const [leads, setLeads] = useState(initialLeads);
+  const [stats_, setStats] = useState(stats);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleLeadAdded = (newLead: any) => {
-    setLeads((prev) => [newLead, ...prev]);
+  // Refetch fresh data from API
+  const refetchData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const leadsRes = await fetch("/api/leads?limit=1000").then((r) =>
+        r.json()
+      );
+      const freshLeads = leadsRes.leads || leadsRes.data || [];
+      
+      // Calculate fresh stats from leads
+      const freshStats = {
+        total: freshLeads.length,
+        newLeads: freshLeads.filter((l: any) => l.status === "NEW_LEAD").length,
+        followingUp: freshLeads.filter((l: any) => l.status === "FOLLOWING_UP")
+          .length,
+        converted: freshLeads.filter((l: any) => l.status === "CONVERTED")
+          .length,
+      };
+
+      setLeads(freshLeads.slice(0, 10));
+      setStats(freshStats);
+    } catch (error) {
+      console.error("Failed to refresh leads:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const handleLeadAdded = useCallback((newLead: any) => {
     setShowAddModal(false);
-  };
-  const targetRemaining = (noOfSoulsTarget ?? 0) - stats.total;
+    // Optimistic UI update
+    setLeads((prev) => [newLead, ...prev].slice(0, 10));
+    // Refresh fresh data from server
+    refetchData();
+  }, [refetchData]);
+
+  const targetRemaining = (noOfSoulsTarget ?? 0) - stats_.total;
 
   const statCards = [
     {
@@ -54,26 +88,26 @@ export default function EvangelistDashboardClient({
     },
     {
       label: "Total Leads Added",
-      value: stats.total,
+      value: stats_.total,
       icon: Users,
       color: "bg-harvest-50 text-harvest-600",
       border: "border-harvest-200",
     },
     {
       label: "Being Followed Up",
-      value: stats.followingUp,
+      value: stats_.followingUp,
       icon: TrendingUp,
       color: "bg-blue-50 text-blue-600",
       border: "border-blue-200",
     },
     {
       label: "No Follow Up",
-      value: stats.newLeads,
+      value: stats_.newLeads,
       icon: Activity,
       color: "bg-orange-50 text-orange-600",
       border: "border-orange-200",
     },
-    // { label: "Converted", value: stats.converted, icon: CheckCircle, color: "bg-green-50 text-green-600", border: "border-green-200" },
+    // { label: "Converted", value: stats_.converted, icon: CheckCircle, color: "bg-green-50 text-green-600", border: "border-green-200" },
   ];
 
   return (
@@ -99,7 +133,7 @@ export default function EvangelistDashboardClient({
       <div>
         <ProgressBar
           total={noOfSoulsTarget || 0}
-          current={stats.total || 0}
+          current={stats_.total || 0}
           label="Evangelism Progress"
           fillColor="#e4a442"
           trackColor="#fae5bc"

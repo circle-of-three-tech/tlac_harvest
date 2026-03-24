@@ -45,7 +45,7 @@ export default function LeadDetailModal({
 
   useEffect(() => {
     if (isAdmin && editing) {
-      fetch("/api/users?role=FOLLOWUP&limit=100")
+      fetch("/api/users?role=ADMIN&role=FOLLOWUP&limit=100")
         .then(r => r.json())
         .then(d => setFollowups(d.users ?? []));
     }
@@ -185,7 +185,7 @@ export default function LeadDetailModal({
                   { label: "Address", value: lead.address || "—" },
                   { label: "Added By", value: lead.addedBy?.name || "—", phone: lead.addedBy?.phone },
                   { label: "Assigned To", value: lead.assignedTo?.name || "Unassigned", phone: lead.assignedTo?.phone },
-                  { label: "Added On", value: format(new Date(lead.createdAt), "MMM d, yyyy") },
+                  { label: "Added On", value: lead.createdAt && !isNaN(new Date(lead.createdAt).getTime()) ? format(new Date(lead.createdAt), "MMM d, yyyy") : "—" },
                 ].map(item => (
                   <div key={item.label}>
                     <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{item.label}</div>
@@ -248,6 +248,12 @@ export default function LeadDetailModal({
                           {SOUL_STATES.map(v => <option key={v} value={v}>{SOUL_STATE_LABELS[v as keyof typeof SOUL_STATE_LABELS]}</option>)}
                         </select>
                       </div>
+                       <div>
+                        <label className="harvest-label">Gender</label>
+                         <select value={editForm.gender} onChange={e => setEditForm((f: any) => ({...f, gender: e.target.value}))} className="harvest-select">
+                          {["MALE", "FEMALE"].map(v => <option key={v} value={v}>{GENDER_LABELS[v as keyof typeof GENDER_LABELS]}</option>)}
+                        </select>
+                          </div>
                       <div>
                         <label className="harvest-label">Phone</label>
                         <input value={editForm.phone} onChange={e => setEditForm((f: any) => ({...f, phone: e.target.value}))} className="harvest-input" />
@@ -335,7 +341,7 @@ export default function LeadDetailModal({
                       {note.user?.name?.[0] ?? "?"}
                     </div>
                     <span className="text-xs font-semibold text-slate-700 truncate">{note.user?.name}</span>
-                    <span className="text-xs text-slate-400 ml-auto flex-shrink-0">{format(new Date(note.createdAt), "MMM d")}</span>
+                    <span className="text-xs text-slate-400 ml-auto flex-shrink-0">{note.createdAt && !isNaN(new Date(note.createdAt).getTime()) ? format(new Date(note.createdAt), "MMM d") : "—"}</span>
                   </div>
                   <p className="text-xs text-slate-700">{note.content}</p>
                 </div>

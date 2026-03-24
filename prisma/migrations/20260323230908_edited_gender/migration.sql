@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Lead" ALTER COLUMN "gender" DROP NOT NULL,
+ALTER COLUMN "gender" DROP DEFAULT;
