@@ -252,12 +252,10 @@ export default function AdminDashboardPage() {
                   },
                 ].map((card, index) => (
                   <div
-                  key={index}
+                    key={index}
                     className={`harvest-card p-4 bg-white w-full shadow-md`}
                   >
-                    <Link 
-                  href={card.link}
-                    className="w-full">
+                    <Link href={card.link} className="w-full">
                       <div
                         className={`inline-flex p-2 rounded-xl ${card.bg} ${card.text} mb-2`}
                       >
