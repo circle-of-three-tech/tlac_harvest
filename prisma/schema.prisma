@@ -37,7 +37,7 @@ model Lead {
   address          String?
   location         String
   additionalNotes  String?
-  gender           Gender            @default(MALE)
+  gender           Gender?            
   soulState        SoulState
   status           LeadStatus        @default(NEW_LEAD)
   churchMembership ChurchMembership?
@@ -197,6 +197,8 @@ enum SMSType {
   SOULSTATE_NEW_CONVERT
   SOULSTATE_UNCHURCHED_BELIEVER
   SOULSTATE_HUNGRY_BELIEVER
+  INACTIVITY_REMINDER_FOLLOWUP
+  INACTIVITY_REMINDER_EVANGELIST
 }
 
 enum SMSStatus {

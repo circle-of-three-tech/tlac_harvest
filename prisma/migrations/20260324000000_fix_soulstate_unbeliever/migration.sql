@@ -1,4 +1,3 @@
--- Add UNBELIEVER to SoulState enum if not exists
 DO $$
 BEGIN
   IF NOT EXISTS (

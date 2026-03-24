@@ -20,7 +20,7 @@ const createLeadSchema = z.object({
   location: z.string().min(1, 'Location is required'),
   additionalNotes: z.string().optional(),
   soulState: z.enum(['UNBELIEVER', 'NEW_CONVERT', 'UNCHURCHED_BELIEVER', 'HUNGRY_BELIEVER']),
-  gender: z.enum(['MALE', 'FEMALE']).optional(),
+  gender: z.enum(['MALE', 'FEMALE']).optional().or(z.literal('')).transform(v => v || undefined),
 });
 
 // ─── GET /api/leads ───────────────────────────────────────────────────────────
@@ -131,7 +131,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {
     console.error('POST /api/leads error:', error);
-    return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json(
+      {
+        error: 'Failed to create lead',
+        ...(process.env.NODE_ENV === 'development' && { detail: message }),
+      },
+      { status: 500 }
+    );
   }
 }
 

@@ -12,7 +12,7 @@ export default function FollowupsPage() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const res = await fetch(`/api/users?role=FOLLOWUP&page=${page}&limit=15`);
+    const res = await fetch(`/api/users?role=ADMIN&role=FOLLOWUP&page=${page}&limit=15`);
     const data = await res.json();
     setUsers(data.users ?? []);
     setTotal(data.total ?? 0);

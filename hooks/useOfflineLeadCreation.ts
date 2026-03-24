@@ -76,6 +76,9 @@ export function useOfflineLeadCreation(
           // Server returned an API error (validation, conflict, auth, etc.).
           // Parse the body and throw — do NOT fall back to offline storage.
           const errorBody = await response.json().catch(() => ({}));
+          if (errorBody.detail) {
+            console.error('[useOfflineLeadCreation] Server error detail:', errorBody.detail);
+          }
           throw new Error(
             errorBody.error ??
             errorBody.message ??

@@ -12,7 +12,9 @@
 
 import { prisma } from '@/lib/prisma';
 import { sendPushToUser, configureWebPush } from '@/lib/push';
+import { sendSMS, getSMSTemplate, renderTemplate } from '@/lib/sms';
 import { NextRequest } from 'next/server';
+import { SMSType } from '@prisma/client';
 
 const INACTIVE_DAYS = 1;
 const INACTIVITY_MS = INACTIVE_DAYS * 24 * 60 * 60 * 1000;
@@ -41,50 +43,90 @@ async function sendInactivityReminders() {
       // Only bother querying users who have at least one push subscription
       pushSubscriptions: { some: {} },
     },
-    select: { id: true, name: true, role: true },
+    select: { id: true, name: true, phone: true, role: true },
   });
 
-  let sentCount = 0;
-  let failedCount = 0;
-  let skippedCount = 0;
+  let pushSent = 0;
+  let pushFailed = 0;
+  let pushSkipped = 0;
+  let smsSent = 0;
+  let smsFailed = 0;
+
+  const pluralS = (days: number) => (days !== 1 ? 's' : '');
 
   for (const user of inactiveUsers) {
-    const payload =
+    // ─── Push notification ───────────────────────────────────────────────────
+    const pushPayload =
       user.role === 'FOLLOWUP'
         ? {
             title: 'Time to Follow Up',
-            body: `It's been ${INACTIVE_DAYS} day${INACTIVE_DAYS !== 1 ? 's' : ''} since you last checked in. Your assigned leads are waiting!`,
+            body: `It's been ${INACTIVE_DAYS} day${pluralS(INACTIVE_DAYS)} since you last checked in. Your assigned leads are waiting!`,
             tag: 'inactivity-reminder-followup',
             data: { url: '/dashboard/followup/leads' },
           }
         : {
             title: 'Time to Add Some Leads',
-            body: `It's been ${INACTIVE_DAYS} day${INACTIVE_DAYS !== 1 ? 's' : ''} since you last added a lead. Help us reach more souls!`,
+            body: `It's been ${INACTIVE_DAYS} day${pluralS(INACTIVE_DAYS)} since you last added a lead. Help us reach more souls!`,
             tag: 'inactivity-reminder-evangelist',
             data: { url: '/dashboard/evangelist' },
           };
 
     try {
-      const result = await sendPushToUser(user.id, payload);
-      sentCount += result.sent;
-      failedCount += result.failed;
-      skippedCount += result.stale; // stale = expired subscriptions cleaned up
+      const result = await sendPushToUser(user.id, pushPayload);
+      pushSent += result.sent;
+      pushFailed += result.failed;
+      pushSkipped += result.stale; // stale = expired subscriptions cleaned up
     } catch (err) {
-      console.error(`[inactivity-reminders] Failed for user ${user.id}:`, err);
-      failedCount++;
+      console.error(`[inactivity-reminders] Push failed for user ${user.id}:`, err);
+      pushFailed++;
+    }
+
+    // ─── SMS notification ───────────────────────────────────────────────────
+    if (user.phone) {
+      const smsType =
+        user.role === 'FOLLOWUP'
+          ? SMSType.INACTIVITY_REMINDER_FOLLOWUP
+          : SMSType.INACTIVITY_REMINDER_EVANGELIST;
+
+      try {
+        const template = await getSMSTemplate(smsType);
+        const message = renderTemplate(template, {
+          name: user.name,
+          days: INACTIVE_DAYS,
+          pluralS: pluralS(INACTIVE_DAYS),
+        });
+
+        const smsResult = await sendSMS({
+          phone: user.phone,
+          message,
+          type: smsType,
+        });
+
+        if (smsResult.success) {
+          smsSent++;
+        } else {
+          smsFailed++;
+        }
+      } catch (err) {
+        console.error(`[inactivity-reminders] SMS failed for user ${user.id}:`, err);
+        smsFailed++;
+      }
     }
   }
 
   return Response.json({
     success: true,
     inactiveUsersFound: inactiveUsers.length,
-    sentCount,
-    failedCount,
-    skippedCount,
+    push: { sent: pushSent, failed: pushFailed, staleSubscriptions: pushSkipped },
+    sms: { sent: smsSent, failed: smsFailed },
   });
+
 }
 
 // ─── Route handlers ───────────────────────────────────────────────────────────
+
+/** GET — for Vercel Cron Jobs (vercel.json crons only support GET). */
+// ─── Route handlers ───────────────────────────────────────────────────────
 
 /** GET — for Vercel Cron Jobs (vercel.json crons only support GET). */
 export async function GET(req: NextRequest) {
