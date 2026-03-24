@@ -146,7 +146,10 @@ export default function AdminDashboardPage() {
               onClick={() => setIsFilterOpen((prev) => !prev)}
               className="w-full flex justify-between text-white bg-harvest-500 py-2 px-4 rounded-xl"
             >
-             <span className="flex items-center gap-4 w-fit"> <Filter size={14}/> Date Filter{" "}</span>
+              <span className="flex items-center gap-4 w-fit">
+                {" "}
+                <Filter size={14} /> Date Filter{" "}
+              </span>
               {isFilterOpen ? <ChevronDown /> : <ChevronRight />}{" "}
             </button>
           </div>
@@ -248,8 +251,13 @@ export default function AdminDashboardPage() {
                     link: "/dashboard/admin/followups",
                   },
                 ].map((card, index) => (
-                  <Link href={card.link} key={index} className="w-full">
-                    <div className={`harvest-card p-4 bg-white shadow-md`}>
+                  <div
+                  key={index}
+                    className={`harvest-card p-4 bg-white w-full shadow-md`}
+                  >
+                    <Link 
+                  href={card.link}
+                    className="w-full">
                       <div
                         className={`inline-flex p-2 rounded-xl ${card.bg} ${card.text} mb-2`}
                       >
@@ -261,8 +269,8 @@ export default function AdminDashboardPage() {
                       <div className="text-xs text-slate-500 mt-0.5">
                         {card.label}
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
                 ))}
               </div>
             </div>
