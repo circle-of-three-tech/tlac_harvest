@@ -177,21 +177,21 @@ export default function LeadDetailModal({
               /* View mode */
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: "Age Range", value: AGE_RANGE_LABELS[lead.ageRange as keyof typeof AGE_RANGE_LABELS] },
-                  { label: "Soul State", value: SOUL_STATE_LABELS[lead.soulState as keyof typeof SOUL_STATE_LABELS] },
-                  { label: "Gender", value: GENDER_LABELS[lead.gender as keyof typeof GENDER_LABELS] },
-                  { label: "Phone", value: lead.phone || "—" },
-                  { label: "Location", value: lead.location },
-                  { label: "Address", value: lead.address || "—" },
-                  { label: "Added By", value: lead.addedBy?.name || "—", phone: lead.addedBy?.phone },
+                  { label: "Age Range", value: AGE_RANGE_LABELS[lead.ageRange as keyof typeof AGE_RANGE_LABELS], phone: undefined },
+                  { label: "Soul State", value: SOUL_STATE_LABELS[lead.soulState as keyof typeof SOUL_STATE_LABELS], phone: undefined },
+                  { label: "Gender", value: GENDER_LABELS[lead.gender as keyof typeof GENDER_LABELS], phone: undefined },
+                  { label: "Phone", value: lead.phone || "—", phone: undefined },
+                  { label: "Location", value: lead.location, phone: undefined },
+                  { label: "Address", value: lead.address || "—", phone: undefined },
+                  { label: "Added By (Evangelist)", value: lead.addedBy?.name || "—", phone: lead.addedBy?.phone },
                   { label: "Assigned To", value: lead.assignedTo?.name || "Unassigned", phone: lead.assignedTo?.phone },
-                  { label: "Added On", value: lead.createdAt && !isNaN(new Date(lead.createdAt).getTime()) ? format(new Date(lead.createdAt), "MMM d, yyyy") : "—" },
-                ].map(item => (
+                  { label: "Added On", value: lead.createdAt && !isNaN(new Date(lead.createdAt).getTime()) ? format(new Date(lead.createdAt), "MMM d, yyyy") : "—", phone: undefined },
+                ].map((item: any) => (
                   <div key={item.label}>
                     <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{item.label}</div>
                     <div className="text-sm text-slate-700 mt-0.5 font-medium">{item.value}</div>
-                    {item?.phone && (
-                      <div className="text-xs text-slate-500 mt-1">Phone: {item.phone}</div>
+                    {item.phone && (
+                      <div className="text-xs text-slate-500 mt-1">📱 {item.phone}</div>
                     )}
                   </div>
                 ))}
