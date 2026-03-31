@@ -1,7 +1,7 @@
 // components/leads/LeadDetailModal.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { X, Trash2, Edit2, Send, Check } from "lucide-react";
+import { X, Trash2, Edit2, Send, Check, Copy } from "lucide-react";
 import { useSession } from "next-auth/react";
 import {
   LEAD_STATUS_LABELS, SOUL_STATE_LABELS, AGE_RANGE_LABELS, GENDER_LABELS,
@@ -37,6 +37,7 @@ export default function LeadDetailModal({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [followups, setFollowups] = useState<any[]>([]);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
 
   const role = (session?.user as any)?.role;
   const isFollowup = role === "FOLLOWUP";
@@ -112,6 +113,13 @@ export default function LeadDetailModal({
       setLead((prev: any) => ({ ...prev, notes: [...(prev.notes ?? []), note] }));
       setNoteText("");
     }
+  };
+
+  const copyToClipboard = (phone: string) => {
+    navigator.clipboard.writeText(phone).then(() => {
+      setCopiedPhone(phone);
+      setTimeout(() => setCopiedPhone(null), 2000);
+    });
   };
 
   const att = getAttendanceStatus(lead.monthsConsistent ?? 0);
@@ -191,7 +199,20 @@ export default function LeadDetailModal({
                     <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{item.label}</div>
                     <div className="text-sm text-slate-700 mt-0.5 font-medium">{item.value}</div>
                     {item.phone && (
-                      <div className="text-xs text-slate-500 mt-1">📱 {item.phone}</div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-xs text-slate-500">📱 {item.phone}</span>
+                        <button
+                          onClick={() => copyToClipboard(item.phone)}
+                          className="p-1 rounded hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 flex-shrink-0"
+                          title="Copy phone number"
+                        >
+                          {copiedPhone === item.phone ? (
+                            <Check className="w-3.5 h-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
