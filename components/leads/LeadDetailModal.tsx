@@ -52,6 +52,16 @@ export default function LeadDetailModal({
     }
   }, [isAdmin, editing]);
 
+  // Ensure phone numbers are loaded for addedBy and assignedTo
+  useEffect(() => {
+    if (lead && (!lead.addedBy?.phone || !lead.assignedTo?.phone)) {
+      fetch(`/api/leads/${lead.id}`)
+        .then(r => r.json())
+        .then(data => setLead(data))
+        .catch(() => {/* silently fail, keep existing data */});
+    }
+  }, [lead?.id]);
+
   const startEdit = () => {
     setEditForm({
       fullName: lead.fullName,
@@ -191,16 +201,18 @@ export default function LeadDetailModal({
                   { label: "Phone", value: lead.phone || "—", phone: undefined },
                   { label: "Location", value: lead.location, phone: undefined },
                   { label: "Address", value: lead.address || "—", phone: undefined },
-                  { label: "Added By (Evangelist)", value: lead.addedBy?.name || "—", phone: lead.addedBy?.phone },
-                  { label: "Assigned To", value: lead.assignedTo?.name || "Unassigned", phone: lead.assignedTo?.phone },
+                  { label: "Added By (Evangelist)", value: lead.addedBy?.name || "—", tooltip: lead.addedBy?.phone ? `📱 ${lead.addedBy.phone}` : undefined, phone: lead.addedBy?.phone },
+                  { label: "Assigned To", value: lead.assignedTo?.name || "Unassigned", tooltip: lead.assignedTo?.phone ? `📱 ${lead.assignedTo.phone}` : undefined, phone: lead.assignedTo?.phone },
                   { label: "Added On", value: lead.createdAt && !isNaN(new Date(lead.createdAt).getTime()) ? format(new Date(lead.createdAt), "MMM d, yyyy") : "—", phone: undefined },
                 ].map((item: any) => (
                   <div key={item.label}>
                     <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{item.label}</div>
-                    <div className="text-sm text-slate-700 mt-0.5 font-medium">{item.value}</div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm text-slate-700 mt-0.5 font-medium">{item.value}</div>
+                    </div>
                     {item.phone && (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-xs text-slate-500">📱 {item.phone}</span>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-md font-mono">📱 {item.phone}</span>
                         <button
                           onClick={() => copyToClipboard(item.phone)}
                           className="p-1 rounded hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 flex-shrink-0"
@@ -305,7 +317,7 @@ export default function LeadDetailModal({
                           <label className="harvest-label">Assign To (Follow-Up)</label>
                           <select value={editForm.assignedToId} onChange={e => setEditForm((f: any) => ({...f, assignedToId: e.target.value}))} className="harvest-select">
                             <option value="">Unassigned</option>
-                            {followups.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            {followups.map((u: any) => <option key={u.id} value={u.id}>{u.name} {u.phone ? `(${u.phone})` : ""}</option>)}
                           </select>
                         </div>
                       </div>
