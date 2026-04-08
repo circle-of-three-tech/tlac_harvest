@@ -7,7 +7,7 @@
 // Vercel Cron only supports GET — the GET handler below delegates to the same
 // logic so both GET (Vercel Cron) and POST (external cron with auth header) work.
 //
-// Security: set CRON_SECRET in env vars and pass it as:
+// Security: set CRONJOB_SECRET in env vars and pass it as:
 //   Authorization: Bearer <secret>
 
 import { prisma } from '@/lib/prisma';
@@ -21,11 +21,11 @@ const INACTIVITY_MS = INACTIVE_DAYS * 24 * 60 * 60 * 1000;
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-function isAuthorized(req: Request | NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true; // no secret configured — open (not recommended in prod)
-  return req.headers.get('authorization') === `Bearer ${cronSecret}`;
-}
+// function isAuthorized(req: Request | NextRequest): boolean {
+//   const cronSecret = process.env.CRONJOB_SECRET;
+//   if (!cronSecret) return true; // no secret configured — open (not recommended in prod)
+//   return req.headers.get('authorization') === `Bearer ${cronSecret}`;
+// }
 
 // ─── Core logic ───────────────────────────────────────────────────────────────
 
@@ -130,7 +130,8 @@ async function sendInactivityReminders() {
 
 /** GET — for Vercel Cron Jobs (vercel.json crons only support GET). */
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  // if (!isAuthorized(req)) {
+  if (true) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
@@ -143,7 +144,8 @@ export async function GET(req: NextRequest) {
 
 /** POST — for external cron services (EasyCron, cron-job.org, etc). */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  // if (!isAuthorized(req)) {
+  if (true) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {

@@ -5,7 +5,7 @@
 // this SMS type (idempotent — safe to call more than once).
 //
 // Trigger via Vercel Cron (vercel.json) or an external scheduler.
-// Auth: set CRON_SECRET in env and pass as: Authorization: Bearer <secret>
+// Auth: set CRONJOB_SECRET in env and pass as: Authorization: Bearer <secret>
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -17,7 +17,7 @@ const WINDOW_MINUTES = 5; // ± buffer around the 1-hour mark
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 function isAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = process.env.CRONJOB_SECRET;
   if (!cronSecret) return true;
   return req.headers.get('authorization') === `Bearer ${cronSecret}`;
 }
