@@ -38,7 +38,8 @@ export interface CachedLead {
   createdByName?: string;
   assignedTo?: string;
   status?: string;
-  cachedAt: number;
+  createdAt?: string; // Original server timestamp
+  cachedAt: number; // When cached locally
 }
 
 export interface CachedUser {
@@ -515,6 +516,6 @@ export function transformCachedLeadToLead(cachedLead: CachedLead): TransformedLe
     createdByName: cachedLead.createdByName,
     assignedTo: cachedLead.assignedTo ? { id: cachedLead.assignedTo, name: cachedLead.createdByName || 'Unknown' } : null,
     addedBy: cachedLead.createdByName ? { id: cachedLead._id, name: cachedLead.createdByName } : null,
-    createdAt: new Date(cachedLead.cachedAt).toISOString(),
+    createdAt: cachedLead.createdAt || new Date(cachedLead.cachedAt).toISOString(),
   };
 }
