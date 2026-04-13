@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
           gender: true,
           phone: true,
           role: true,
+          roles: true,
           createdAt: true,
           _count: {
             select: {

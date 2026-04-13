@@ -21,10 +21,17 @@ const adminUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
-  role: z.enum(['EVANGELIST', 'FOLLOWUP']),
+  roles: z.array(z.enum(['EVANGELIST', 'FOLLOWUP', 'ADMIN'])).min(1, 'At least one role is required'),
   gender: z.enum(['MALE', 'FEMALE']).optional().nullable(),
   noOfSoulsTarget: z.number().int().min(0).optional(),
 });
+
+/** Priority order for deriving the primary role from a roles array */
+const ROLE_PRIORITY: Record<string, number> = { ADMIN: 3, FOLLOWUP: 2, EVANGELIST: 1 };
+
+function derivePrimaryRole(roles: string[]): string {
+  return roles.reduce((best, r) => (ROLE_PRIORITY[r] ?? 0) > (ROLE_PRIORITY[best] ?? 0) ? r : best, roles[0]);
+}
 
 // ─── GET /api/users/[id] ──────────────────────────────────────────────────────
 
@@ -51,6 +58,7 @@ export async function GET(
         name: true,
         email: true,
         role: true,
+        roles: true,
         phone: true,
         gender: true,
         noOfSoulsTarget: true,
@@ -119,6 +127,11 @@ export async function PATCH(
 
     const updateData = parsed.data as Record<string, unknown>;
 
+    // If admin is setting roles array, also derive and set the primary role
+    if (userRole === 'ADMIN' && Array.isArray(updateData.roles)) {
+      updateData.role = derivePrimaryRole(updateData.roles as string[]);
+    }
+
     // Check email uniqueness if email is being updated
     if (updateData.email && updateData.email !== existingUser.email) {
       const emailExists = await prisma.user.findUnique({
@@ -142,6 +155,7 @@ export async function PATCH(
         name: true,
         email: true,
         role: true,
+        roles: true,
         phone: true,
         gender: true,
         noOfSoulsTarget: true,

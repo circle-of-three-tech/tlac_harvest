@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          select: { id: true, email: true, name: true, role: true, password: true },
+          select: { id: true, email: true, name: true, role: true, roles: true, password: true },
         });
 
         if (!user) return null;
@@ -28,7 +28,10 @@ export const authOptions: NextAuthOptions = {
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) return null;
 
-        return { id: user.id, email: user.email, name: user.name, role: user.role };
+        // Ensure roles array is always populated (handles legacy records with empty array)
+        const roles = user.roles && user.roles.length > 0 ? user.roles : [user.role as string];
+
+        return { id: user.id, email: user.email, name: user.name, role: user.role, roles };
       },
     }),
   ],
@@ -38,12 +41,14 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.roles = (user as any).roles ?? [user.role];
       }
       return token;
     },
     async session({ session, token }) {
       session.user.id = token.id;
       session.user.role = token.role;
+      (session.user as any).roles = (token.roles as string[]) ?? [token.role];
       return session;
     },
   },

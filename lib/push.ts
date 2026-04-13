@@ -131,7 +131,7 @@ export async function sendPushToRole(
   payload: PushPayload
 ): Promise<SendResult> {
   const subscriptions = await prisma.pushSubscription.findMany({
-    where: { user: { role } },
+    where: { user: { roles: { has: role } } },
     select: { id: true, endpoint: true, auth: true, p256dh: true, userId: true },
   });
 

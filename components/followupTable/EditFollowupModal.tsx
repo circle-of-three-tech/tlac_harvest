@@ -8,6 +8,12 @@ const GENDER_OPTIONS = [
   { value: "FEMALE", label: "Female" },
 ];
 
+const ALL_ROLES = [
+  { value: "EVANGELIST", label: "Evangelist" },
+  { value: "FOLLOWUP", label: "Follow-Up" },
+  { value: "ADMIN", label: "Admin" },
+];
+
 interface FollowupMember {
   id: string;
   name: string;
@@ -15,6 +21,7 @@ interface FollowupMember {
   phone?: string;
   gender?: string;
   role: string;
+  roles: string[];
   noOfSoulsTarget?: number;
 }
 
@@ -31,49 +38,59 @@ export default function EditFollowupModal({
   onSuccess: (updatedFollowupMember: FollowupMember) => void;
   onDelete?: (followupMemberId: string) => void;
 }) {
-  const [form, setForm] = useState<FollowupMember>(
-    {
-      id: "",
-      name: "",
-      email: "",
-      phone: "",
-      role: "FOLLOWUP",
-      gender: "",
-      noOfSoulsTarget: 0,
-    }
-  );
+  const [form, setForm] = useState<FollowupMember>({
+    id: "",
+    name: "",
+    email: "",
+    phone: "",
+    role: "FOLLOWUP",
+    roles: ["FOLLOWUP"],
+    gender: "",
+    noOfSoulsTarget: 0,
+  });
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const fetchEvangelist = async (id: string) => {
+  const fetchUser = async (id: string) => {
     try {
       setLoading(true);
       setError("");
       const res = await fetch(`/api/users/${id}`);
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to fetch evangelist details");
+        throw new Error(data.error || "Failed to fetch user details");
       }
       const data = await res.json();
+      // Normalise: if roles array is empty, fall back to single role
+      if (!data.roles || data.roles.length === 0) {
+        data.roles = [data.role];
+      }
       setForm(data);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load evangelist details";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Failed to load user details");
     } finally {
       setLoading(false);
     }
   };
-    
-  // Update form when followupMember prop changes
+
   useEffect(() => {
     if (followupMemberId && isOpen) {
-      fetchEvangelist(followupMemberId);
+      fetchUser(followupMemberId);
     }
   }, [followupMemberId, isOpen]);
-   
+
+  const toggleRole = (role: string) => {
+    const current = form.roles ?? [];
+    const next = current.includes(role)
+      ? current.filter((r) => r !== role)
+      : [...current, role];
+    // Always keep at least one role
+    if (next.length === 0) return;
+    setForm({ ...form, roles: next });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -87,7 +104,7 @@ export default function EditFollowupModal({
           name: form.name,
           email: form.email,
           phone: form.phone,
-          role: form.role,
+          roles: form.roles,
           gender: form.gender || null,
           noOfSoulsTarget: form.noOfSoulsTarget,
         }),
@@ -95,15 +112,14 @@ export default function EditFollowupModal({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to update followup member");
+        throw new Error(data.error || "Failed to update user");
       }
 
-      const updatedFollowupMember = await res.json();
-      onSuccess(updatedFollowupMember);
+      const updated = await res.json();
+      onSuccess(updated);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to update followup member";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Failed to update user");
     } finally {
       setLoading(false);
     }
@@ -114,21 +130,17 @@ export default function EditFollowupModal({
     setDeleting(true);
 
     try {
-      const res = await fetch(`/api/users/${form.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/users/${form.id}`, { method: "DELETE" });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to delete followup member");
+        throw new Error(data.error || "Failed to delete user");
       }
 
-    //   toast.success("Followup member deleted successfully");
       onDelete?.(form.id);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to delete followup member";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Failed to delete user");
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -142,15 +154,19 @@ export default function EditFollowupModal({
       <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-2xl max-h-[90vh] overflow-y-auto animate-fadeIn">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-harvest-50">
           <h2 className="font-display font-bold text-slate-900 text-lg sm:text-xl">
-            Edit Followup Member Details
+            Edit User Details
           </h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-harvest-500 text-white"
-          >
+          <button onClick={onClose} className="p-2 rounded-xl bg-harvest-500 text-white">
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {loading && (
+          <div className="p-4 flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-harvest-500"></div>
+            <p>Loading...</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -189,20 +205,33 @@ export default function EditFollowupModal({
               />
             </div>
 
-
+            {/* Multi-role selector — admin only in UI context */}
             <div className="col-span-1 sm:col-span-2">
-              <label className="harvest-label">Role</label>
-              <select   
-                value={form.role || ""}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="harvest-select"
-              >
-                <option value="ADMIN">Admin</option>
-                <option value="FOLLOWUP">Followup</option>
-                <option value="EVANGELIST">Evangelist</option>
-              </select>
+              <label className="harvest-label">Roles *</label>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {ALL_ROLES.map((r) => (
+                  <label
+                    key={r.value}
+                    className={`flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      (form.roles ?? []).includes(r.value)
+                        ? "bg-harvest-100 border-harvest-400 text-harvest-800"
+                        : "bg-white border-slate-200 text-slate-500 hover:border-harvest-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-harvest-500"
+                      checked={(form.roles ?? []).includes(r.value)}
+                      onChange={() => toggleRole(r.value)}
+                    />
+                    {r.label}
+                  </label>
+                ))}
+              </div>
+              {(form.roles ?? []).length === 0 && (
+                <p className="text-red-500 text-xs mt-1">At least one role is required.</p>
+              )}
             </div>
-  
 
             <div>
               <label className="harvest-label">Gender</label>
@@ -243,9 +272,7 @@ export default function EditFollowupModal({
 
           {showDeleteConfirm && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-3 sm:px-4 py-3 sm:py-4 text-sm text-red-900">
-              <p className="font-semibold mb-2">
-                Permanently delete this followup member?
-              </p>
+              <p className="font-semibold mb-2">Permanently delete this user?</p>
               <p className="text-red-700 text-xs sm:text-sm mb-3">
                 This action cannot be undone. Make sure they don't have any assigned leads.
               </p>
@@ -272,7 +299,7 @@ export default function EditFollowupModal({
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (form.roles ?? []).length === 0}
               className="harvest-btn-primary flex-1 justify-center disabled:opacity-60 gap-2 text-sm"
             >
               <Save className="w-4 h-4" />
