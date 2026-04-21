@@ -39,6 +39,7 @@ import {
   updateOperationStatus,
   deleteOperation,
   getFailedOperations,
+  requeueOrphanSyncingOperations,
   type QueuedOperation,
 } from './operationQueue';
 
@@ -183,6 +184,14 @@ export async function initializeSyncManager(): Promise<void> {
   if (typeof window === 'undefined') return;
 
   try {
+    // Recover any operations left in 'syncing' state from a previous tab /
+    // process crash. Without this, they would be invisible to both the
+    // pending and failed queries and never complete.
+    const orphanCount = await requeueOrphanSyncingOperations().catch(() => 0);
+    if (orphanCount > 0) {
+      console.log(`[sync] Requeued ${orphanCount} orphan 'syncing' operation(s).`);
+    }
+
     const pending = await getPendingLeads();
     const queuedOps = await getPendingOperations();
     currentSyncStatus.pendingCount = pending.length;
@@ -402,10 +411,12 @@ async function _syncQueuedOperationsInternal(): Promise<void> {
         }
 
         case 'reassign': {
+          // Accept either key from older queued operations for backwards compat.
+          const assignedToId = op.payload.assignedToId ?? op.payload.assignedTo;
           response = await fetch(`/api/leads/${op.resourceId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assignedTo: op.payload.assignedTo }),
+            body: JSON.stringify({ assignedToId }),
           });
           syncSuccess = response.ok;
           break;
@@ -659,8 +670,7 @@ export async function loadCachedLeads(): Promise<void> {
     }
 
     const data = await response.json();
-    const leads: CachedLead[] = (data.leads || []).map((lead: any) => ({
-      // FIX: Prisma returns `id`, not `_id`. Fall back to _id for safety.
+    const leads: Omit<CachedLead, 'cachedAt'>[] = (data.leads || []).map((lead: any) => ({
       _id: lead?.id ?? lead?._id,
       fullName: lead.fullName,
       ageRange: lead.ageRange,
@@ -670,9 +680,10 @@ export async function loadCachedLeads(): Promise<void> {
       additionalNotes: lead.additionalNotes,
       soulState: lead.soulState,
       gender: lead.gender,
-      createdByName: lead.createdByName,
-      assignedTo: lead.assignedTo,
       status: lead.status,
+      addedBy: lead.addedBy ? { id: lead.addedBy.id, name: lead.addedBy.name } : null,
+      assignedTo: lead.assignedTo ? { id: lead.assignedTo.id, name: lead.assignedTo.name } : null,
+      createdAt: lead.createdAt,
     }));
 
     await cacheLeads(leads);
@@ -775,13 +786,13 @@ export async function loadCachedActivityLogs(): Promise<void> {
     }
 
     const data = await response.json();
-    const logs: CachedActivityLog[] = (data.logs || []).map((log: any) => ({
+    const logs: CachedActivityLog[] = (data.auditLogs || []).map((log: any) => ({
       _id: log?.id ?? log?._id,
       userId: log.userId,
-      userName: log.userName,
-      action: log.action,
-      resourceType: log.resourceType,
-      timestamp: log.timestamp,
+      userName: log.user?.name ?? '',
+      action: log.type,
+      resourceType: 'lead',
+      timestamp: log.createdAt,
     }));
 
     await cacheActivityLogs(logs);
@@ -804,10 +815,10 @@ export async function loadCachedSMSLogs(): Promise<void> {
     }
 
     const data = await response.json();
-    const logs: CachedSMSLog[] = (data.smsLogs || []).map((log: any) => ({
+    const logs: CachedSMSLog[] = (data.logs || []).map((log: any) => ({
       _id: log.id ?? log._id,
-      phone: log.phone,
-      message: log.message,
+      phone: log.recipientPhone ?? log.phone ?? '',
+      message: log.content ?? log.message ?? '',
       status: log.status,
       createdAt: log.createdAt,
     }));

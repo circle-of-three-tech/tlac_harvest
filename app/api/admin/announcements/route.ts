@@ -104,32 +104,26 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send push notifications to target roles
+    // Send a single push fan-out. sendPushToRole with an array deduplicates
+    // users who belong to multiple roles (so an EVANGELIST+FOLLOWUP user
+    // gets one notification for an ALL-targeted announcement, not two).
     try {
-      const pushRoles: Array<'EVANGELIST' | 'FOLLOWUP' | 'ADMIN'> = [];
-      
-      if (data.targetRole === 'ALL') {
-        pushRoles.push('EVANGELIST', 'FOLLOWUP', 'ADMIN');
-      } else {
-        pushRoles.push(data.targetRole as 'EVANGELIST' | 'FOLLOWUP');
-      }
+      const pushRoles: Array<'EVANGELIST' | 'FOLLOWUP' | 'ADMIN'> =
+        data.targetRole === 'ALL'
+          ? ['EVANGELIST', 'FOLLOWUP', 'ADMIN']
+          : [data.targetRole as 'EVANGELIST' | 'FOLLOWUP'];
 
       configureWebPush();
 
-      for (const role of pushRoles) {
-        await sendPushToRole(
-          role,
-          {
-            title: `New Announcement: ${data.title}`,
-            body: data.content.substring(0, 100) + (data.content.length > 100 ? '...' : ''),
-            tag: `announcement-${announcement.id}`,
-            data: {
-              url: '/dashboard',
-              announcementId: announcement.id,
-            },
-          }, 
-        );
-      }
+      await sendPushToRole(pushRoles, {
+        title: `New Announcement: ${data.title}`,
+        body: data.content.substring(0, 100) + (data.content.length > 100 ? '...' : ''),
+        tag: `announcement-${announcement.id}`,
+        data: {
+          url: '/dashboard',
+          announcementId: announcement.id,
+        },
+      });
     } catch (pushError) {
       console.error('Error sending push notifications:', pushError);
       // Don't fail the announcement creation if push fails

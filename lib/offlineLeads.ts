@@ -35,9 +35,9 @@ export interface CachedLead {
   additionalNotes?: string;
   soulState: string;
   gender?: string;
-  createdByName?: string;
-  assignedTo?: string;
   status?: string;
+  addedBy?: { id: string; name: string } | null;
+  assignedTo?: { id: string; name: string } | null;
   createdAt?: string; // Original server timestamp
   cachedAt: number; // When cached locally
 }
@@ -513,9 +513,9 @@ export function transformCachedLeadToLead(cachedLead: CachedLead): TransformedLe
     address: cachedLead.address,
     additionalNotes: cachedLead.additionalNotes,
     gender: cachedLead.gender,
-    createdByName: cachedLead.createdByName,
-    assignedTo: cachedLead.assignedTo ? { id: cachedLead.assignedTo, name: cachedLead.createdByName || 'Unknown' } : null,
-    addedBy: cachedLead.createdByName ? { id: cachedLead._id, name: cachedLead.createdByName } : null,
+    createdByName: cachedLead.addedBy?.name,
+    assignedTo: cachedLead.assignedTo ?? null,
+    addedBy: cachedLead.addedBy ?? null,
     createdAt: cachedLead.createdAt || new Date(cachedLead.cachedAt).toISOString(),
   };
 }

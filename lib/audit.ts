@@ -109,18 +109,20 @@ export async function logAssignment(
   leadId: string,
   userId: string,
   assignedToUserId: string | null,
-  assignedToUserName?: string
+  assignedToUserName?: string,
+  previousAssignedToUserId?: string | null
 ): Promise<string | null> {
   return logAuditEvent({
     type: 'ASSIGNMENT',
     leadId,
     userId,
     fieldName: 'assignedToId',
-    oldValue: undefined,
+    oldValue: previousAssignedToUserId ?? undefined,
     newValue: assignedToUserId ?? undefined,
     details: {
       assignedToUserId,
       assignedToUserName,
+      previousAssignedToUserId: previousAssignedToUserId ?? null,
     },
   });
 }

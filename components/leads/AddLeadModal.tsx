@@ -147,7 +147,6 @@ export default function AddLeadModal({
             <div className="col-span-2">
               <label className="harvest-label">Phone</label>
               <input
-              required
                 type="tel"
                 value={form.phone}
                 onChange={(e) =>

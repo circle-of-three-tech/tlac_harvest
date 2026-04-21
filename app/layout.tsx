@@ -43,8 +43,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* Standard PWA capability meta (replaces deprecated apple-mobile-web-app-capable) */}
         <meta name="mobile-web-app-capable" content="yes" />
-        {/* Standards-compliant PWA capable tag (suppresses deprecation warning) */}
-        <meta name="mobile-web-app-capable" content="yes" />
         {/* iOS PWA splash screens */}
         <link
           rel="apple-touch-startup-image"

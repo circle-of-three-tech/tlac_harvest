@@ -157,10 +157,14 @@ function useOfflineData<T>(
 
 // ─── Specific hooks ───────────────────────────────────────────────────────────
 
-/** Leads — most-recent 10, with offline cache fallback. */
+/**
+ * Leads — full working set, paginated client-side by `usePaginatedOfflineData`.
+ * Fetching the full page lets pagination keep working while offline and
+ * matches the cache warm-up already done by the sync manager.
+ */
 export function useLeadsData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/leads?limit=10');
+    const res = await fetch('/api/leads?limit=1000', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch leads (${res.status})`);
     const json = await res.json();
     return json.leads ?? [];
@@ -171,10 +175,10 @@ export function useLeadsData() {
   return useOfflineData(fetchFn, cacheFn);
 }
 
-/** Users — most-recent 10. */
+/** Users — full list (paginated client-side). */
 export function useUsersData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/users?limit=10');
+    const res = await fetch('/api/users?limit=500', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch users (${res.status})`);
     const json = await res.json();
     return json.users ?? [];
@@ -192,7 +196,7 @@ export function useUsersData() {
  */
 export function useUsersByRole(role: string) {
   const fetchFn = useCallback(async () => {
-    const res = await fetch(`/api/users?role=${encodeURIComponent(role)}&limit=10`);
+    const res = await fetch(`/api/users?role=${encodeURIComponent(role)}&limit=500`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch ${role} users (${res.status})`);
     const json = await res.json();
     return json.users ?? [];
@@ -209,7 +213,7 @@ export function useUsersByRole(role: string) {
 /** Active announcements. */
 export function useAnnouncementsData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/announcements/active');
+    const res = await fetch('/api/announcements/active', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch announcements (${res.status})`);
     const json = await res.json();
     return json.announcements ?? [];
@@ -223,7 +227,7 @@ export function useAnnouncementsData() {
 /** Admin stats. */
 export function useStatsData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/admin/stats');
+    const res = await fetch('/api/admin/stats', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch stats (${res.status})`);
     return res.json();
   }, []);
@@ -240,10 +244,10 @@ export function useStatsData() {
 /** Activity log — most-recent 10 entries. */
 export function useActivityLogsData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/admin/activity-log?limit=10');
+    const res = await fetch('/api/admin/activity-log?limit=10', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch activity logs (${res.status})`);
     const json = await res.json();
-    return json.logs ?? [];
+    return json.auditLogs ?? [];
   }, []);
 
   const cacheFn = useCallback(() => getCachedActivityLogs(), []);
@@ -254,10 +258,10 @@ export function useActivityLogsData() {
 /** SMS logs — most-recent 10 entries. */
 export function useSMSLogsData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/admin/sms-logs?limit=10');
+    const res = await fetch('/api/admin/sms-logs?limit=10', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch SMS logs (${res.status})`);
     const json = await res.json();
-    return json.smsLogs ?? [];
+    return json.logs ?? [];
   }, []);
 
   const cacheFn = useCallback(() => getCachedSMSLogs(), []);

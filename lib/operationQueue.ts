@@ -159,7 +159,9 @@ export async function clearAllOperations(): Promise<void> {
 // ─── Deduplication ────────────────────────────────────────────────────────────
 
 /**
- * Return deduplicated pending operations ready for sync.
+ * Return deduplicated operations ready for sync. Includes both 'pending'
+ * operations and 'failed' operations that still have retries left, so a
+ * transient server error doesn't permanently strand an edit.
  *
  * Rules:
  * - `addNote` operations are NEVER deduplicated — each note is distinct.
@@ -169,11 +171,17 @@ export async function clearAllOperations(): Promise<void> {
  * Result is sorted oldest-first so earlier operations apply before later ones.
  */
 export async function getDedupedOperations(): Promise<QueuedOperation[]> {
-  const pending = await getPendingOperations();
+  const [pending, failed] = await Promise.all([
+    getPendingOperations(),
+    getFailedOperations(),
+  ]);
+
+  const retriable = failed.filter(canRetryOperation);
+  const all = [...pending, ...retriable];
 
   // Separate notes (always keep all) from mutations (deduplicate).
-  const notes = pending.filter((op) => op.type === 'addNote');
-  const mutations = pending.filter((op) => op.type !== 'addNote');
+  const notes = all.filter((op) => op.type === 'addNote');
+  const mutations = all.filter((op) => op.type !== 'addNote');
 
   // For mutations: keep latest per resourceId.
   const latestMutations = new Map<string, QueuedOperation>();
@@ -184,12 +192,46 @@ export async function getDedupedOperations(): Promise<QueuedOperation[]> {
     }
   }
 
-  const all = [...latestMutations.values(), ...notes];
-  return all.sort((a, b) => a.timestamp - b.timestamp);
+  const result = [...latestMutations.values(), ...notes];
+  return result.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 // ─── Retry guard ──────────────────────────────────────────────────────────────
 
 export function canRetryOperation(op: QueuedOperation): boolean {
   return op.retryCount < MAX_RETRIES;
+}
+
+// ─── Orphan recovery ──────────────────────────────────────────────────────────
+
+/**
+ * Reset any operations left in 'syncing' state back to 'pending'.
+ *
+ * An operation is set to 'syncing' just before its fetch; if the tab is
+ * closed or the process is killed mid-fetch, the status never advances and
+ * the operation becomes an orphan, invisible to both getPendingOperations()
+ * and getFailedOperations(). Call this once at sync-manager init.
+ */
+export async function requeueOrphanSyncingOperations(): Promise<number> {
+  const database = await getIndexedDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.index('status').openCursor(IDBKeyRange.only('syncing'));
+    let count = 0;
+
+    req.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+      if (cursor) {
+        const op = cursor.value as QueuedOperation;
+        cursor.update({ ...op, status: 'pending' });
+        count++;
+        cursor.continue();
+      } else {
+        resolve(count);
+      }
+    };
+
+    req.onerror = () => reject(req.error);
+  });
 }

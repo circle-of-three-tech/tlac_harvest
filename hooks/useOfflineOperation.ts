@@ -192,12 +192,12 @@ export function useLeadMutation() {
         'reassign',
         leadId,
         'lead',
-        { assignedTo: userId },
+        { assignedToId: userId },
         () =>
           fetch(`/api/leads/${leadId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assignedTo: userId }),
+            body: JSON.stringify({ assignedToId: userId }),
           })
       ),
     [queueMutation]

@@ -59,7 +59,11 @@ export async function GET(
 
     if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    if (session.user.role === 'FOLLOWUP' && lead.assignedToId !== session.user.id) {
+    const roles = session.user.roles?.length ? session.user.roles : [session.user.role];
+    const isAdmin = roles.includes('ADMIN');
+    const isOwner = lead.addedById === session.user.id;
+    const isAssignee = lead.assignedToId === session.user.id;
+    if (!isAdmin && !isOwner && !isAssignee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -80,19 +84,27 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { id: userId, role } = session.user;
+    const { id: userId } = session.user;
+    const roles = session.user.roles?.length ? session.user.roles : [session.user.role];
+    const isAdmin = roles.includes('ADMIN');
+    const isEvangelist = roles.includes('EVANGELIST');
 
     const lead = await prisma.lead.findUnique({ where: { id: params.id } });
     if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    if (role === 'FOLLOWUP' && lead.assignedToId !== userId) {
+    const isOwner = lead.addedById === userId;
+    const isAssignee = lead.assignedToId === userId;
+    if (!isAdmin && !isOwner && !isAssignee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await req.json();
 
-    // Parse against the appropriate schema for the caller's role.
-    const schema = role === 'FOLLOWUP' ? followupUpdateSchema : adminUpdateSchema;
+    // Admins + evangelists editing leads they added get the full schema.
+    // Followups (or evangelists editing leads they were assigned but didn't
+    // add) get the narrower church-progress-only schema.
+    const canUseAdminSchema = isAdmin || (isEvangelist && isOwner);
+    const schema = canUseAdminSchema ? adminUpdateSchema : followupUpdateSchema;
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -183,7 +195,14 @@ async function auditChanges(
   }
 
   if (isAssignmentChange) {
-    await logAssignment(leadId, userId, updated.assignedToId, updated.assignedTo?.name);
+    const previousAssignedToId = (oldLead.assignedToId as string | null | undefined) ?? null;
+    await logAssignment(
+      leadId,
+      userId,
+      updated.assignedToId,
+      updated.assignedTo?.name,
+      previousAssignedToId
+    );
   }
 }
 

@@ -13,6 +13,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   initializeSyncManager,
   cleanupSyncManager,
@@ -21,6 +22,7 @@ import {
   forceCheckNetwork,
   getSyncStatus,
   clearOfflineData,
+  setCurrentUserRole,
   type SyncStatus,
 } from '@/lib/syncManager';
 
@@ -47,6 +49,7 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     isOnline: true,   // safe SSR default; corrected on first health check
     isSyncing: false,
@@ -58,6 +61,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
   // Guard against setting state after unmount (e.g. hot-reload race).
   const mountedRef = useRef(true);
+
+  // Keep sync manager informed of the current user's role so admin-only
+  // caches (sms logs, activity log, stats) only load for admins.
+  useEffect(() => {
+    setCurrentUserRole(session?.user?.role ?? null);
+  }, [session?.user?.role]);
 
   useEffect(() => {
     mountedRef.current = true;

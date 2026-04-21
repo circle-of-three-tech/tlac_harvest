@@ -24,10 +24,10 @@ export default function AnnouncementsBanner() {
   const fetchAnnouncements = async () => {
     try {
       setLoading(false);
-      const res = await fetch("/api/announcements");
+      const res = await fetch("/api/announcements/active");
       if (!res.ok) throw new Error("Failed to fetch announcements");
       const data = await res.json();
-      setAnnouncements(data);
+      setAnnouncements(data.announcements ?? []);
     } catch (error) {
       console.error("Failed to load announcements:", error);
       setLoading(false);

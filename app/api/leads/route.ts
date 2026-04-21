@@ -42,21 +42,31 @@ export async function GET(req: NextRequest) {
     const assignedToId = searchParams.get('assignedToId');
     const addedById = searchParams.get('addedById');
 
-    const { id: userId, role } = session.user;
+    const { id: userId } = session.user;
+    const roles = session.user.roles?.length ? session.user.roles : [session.user.role];
+    const isAdmin = roles.includes('ADMIN');
+    const isEvangelist = roles.includes('EVANGELIST');
+    const isFollowup = roles.includes('FOLLOWUP');
 
-    // Build where clause — role restrictions come first, explicit filters can override.
+    // Build where clause. Role restrictions are INVARIANTS — they cannot be
+    // overridden by explicit filter params. A non-admin supplying a filter that
+    // targets another user's leads must still be constrained to their own scope.
     const where: Record<string, unknown> = {};
 
-    if (assignedToId) {
-      where.assignedToId = assignedToId;
-    } else if (role === 'FOLLOWUP') {
+    if (isAdmin) {
+      // Admin can filter freely.
+      if (assignedToId) where.assignedToId = assignedToId;
+      if (addedById) where.addedById = addedById;
+    } else if (isEvangelist && isFollowup) {
+      // Dual-role users see the union of what they added + what's assigned to
+      // them. Explicit filter params narrow within that scope but cannot
+      // widen it.
+      where.OR = [{ addedById: userId }, { assignedToId: userId }];
+    } else if (isFollowup) {
       where.assignedToId = userId;
-    }
-
-    if (addedById) {
-      where.addedById = addedById;
-    } else if (role === 'EVANGELIST') {
+    } else if (isEvangelist) {
       where.addedById = userId;
+      if (assignedToId) where.assignedToId = assignedToId;
     }
 
     if (dateFrom || dateTo) {
@@ -78,6 +88,10 @@ export async function GET(req: NextRequest) {
           notes: {
             include: { user: { select: { id: true, name: true } } },
             orderBy: { createdAt: 'desc' },
+            // Cap notes per lead to prevent a single chatty lead from
+            // ballooning the list response. The detail page fetches the
+            // full note history.
+            take: 5,
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -101,8 +115,12 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { id: userId, role } = session.user;
-    if (role === 'FOLLOWUP') {
+    const { id: userId } = session.user;
+    // Only users who are evangelists or admins can add leads. A
+    // followup-only user cannot.
+    const roles = session.user.roles?.length ? session.user.roles : [session.user.role];
+    const canCreate = roles.includes('EVANGELIST') || roles.includes('ADMIN');
+    if (!canCreate) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

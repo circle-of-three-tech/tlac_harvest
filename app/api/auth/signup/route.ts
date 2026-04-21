@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { z } from "zod";
 
+// Self-signup only creates EVANGELIST accounts. FOLLOWUP is a trusted staff
+// role — an admin promotes via /api/users/[id] after vetting.
 const signupSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
@@ -14,7 +16,6 @@ const signupSchema = z.object({
   phone: z.string().optional(),
   gender: z.enum(["MALE", "FEMALE"]),
   noOfSoulsTarget: z.string().optional(),
-  role: z.enum(["EVANGELIST", "FOLLOWUP"]),
 });
 
 export async function POST(req: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email already in use" }, { status: 400 });
     }
 
-    const hashed = await bcrypt.hash(data.password, 10);
+    const hashed = await bcrypt.hash(data.password, 12);
     const user = await prisma.user.create({
       data: {
         name: data.name,
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest) {
         noOfSoulsTarget: parseInt(data.noOfSoulsTarget || "0") || 0,
         gender: data.gender,
         phone: data.phone || null,
-        role: data.role as Role,
+        role: Role.EVANGELIST,
+        roles: ['EVANGELIST'],
       },
     });
 

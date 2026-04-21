@@ -9,8 +9,6 @@ import {
   Lock,
   LogIn,
   AlertCircle,
-  Zap,
-  HeartHandshake,
   Phone,
   Users,
   Target,
@@ -28,7 +26,6 @@ export default function SignupPage() {
     gender: "",
     phone: "",
     noOfSoulsTarget: "",
-    role: "EVANGELIST",
   });
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [error, setError] = useState("");
@@ -95,52 +92,6 @@ export default function SignupPage() {
 
         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-5">
-             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-               Select Your Role
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    value: "EVANGELIST",
-                    label: "Evangelist (Harvester)",
-                    desc: "Add new leads",
-                    icon: Zap,
-                  },
-                  {
-                    value: "FOLLOWUP",
-                    label: "Follow-Up",
-                    desc: "Disciple leads",
-                    icon: HeartHandshake,
-                  },
-                ].map((opt) => {
-                  const RoleIcon = opt.icon;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() =>
-                        setForm((f) => ({ ...f, role: opt.value }))
-                      }
-                      className={`rounded-xl p-3 text-left transition-all flex items-start gap-2 ${
-                        form.role === opt.value
-                          ? "bg-earth-100 text-earth-500"
-                          : "bg-white text-earth-500"
-                      }`}
-                    >
-                      <RoleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <div className="font-semibold text-sm">{opt.label}</div>
-                        <div className="text-xs opacity-70 mt-0.5">
-                          {opt.desc}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                 Full Name
@@ -198,7 +149,6 @@ export default function SignupPage() {
               </div>
             </div>
 
-          {form.role === "EVANGELIST" && (
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                 No. of Souls Target
@@ -207,7 +157,7 @@ export default function SignupPage() {
                 <Target className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-earth-500" />
                 <input
                   type="number"
-                  required={ form.role === "EVANGELIST" ? true : false }
+                  required
                   value={form.noOfSoulsTarget}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, noOfSoulsTarget: e.target.value }))
@@ -216,8 +166,7 @@ export default function SignupPage() {
                   className="w-full bg-earth-50/20 border border-earth-100 rounded-xl pl-10 pr-4 py-3 text-slate-500 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-earth-400 text-sm"
                 />
               </div>
-            </div>  
-          )}
+            </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">

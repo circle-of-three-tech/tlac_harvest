@@ -16,12 +16,15 @@ const selfUpdateSchema = z.object({
   noOfSoulsTarget: z.number().int().min(0).optional(),
 });
 
-/** Schema for admin updating any user */
+/** Schema for admin updating any user. All fields optional (partial PATCH). */
 const adminUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
-  roles: z.array(z.enum(['EVANGELIST', 'FOLLOWUP', 'ADMIN'])).min(1, 'At least one role is required'),
+  roles: z
+    .array(z.enum(['EVANGELIST', 'FOLLOWUP', 'ADMIN']))
+    .min(1, 'At least one role is required')
+    .optional(),
   gender: z.enum(['MALE', 'FEMALE']).optional().nullable(),
   noOfSoulsTarget: z.number().int().min(0).optional(),
 });
@@ -209,12 +212,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check if user has active leads assigned to them
-    if (userToDelete._count.assignedLeads > 0) {
+    // Block deletion when user has related leads. addedLeads uses a required
+    // FK so Prisma will throw a constraint error at delete time — we surface
+    // a clean 409 instead. assignedLeads is optional, but we also require
+    // manual reassignment so leads aren't silently orphaned.
+    if (userToDelete._count.assignedLeads > 0 || userToDelete._count.addedLeads > 0) {
+      const parts: string[] = [];
+      if (userToDelete._count.addedLeads > 0) {
+        parts.push(`${userToDelete._count.addedLeads} added lead(s)`);
+      }
+      if (userToDelete._count.assignedLeads > 0) {
+        parts.push(`${userToDelete._count.assignedLeads} assigned lead(s)`);
+      }
       return NextResponse.json(
         {
-          error: 'Cannot delete user with assigned leads',
-          details: `User has ${userToDelete._count.assignedLeads} assigned lead(s). Please reassign them first.`,
+          error: 'Cannot delete user with related leads',
+          details: `User has ${parts.join(' and ')}. Please reassign them first.`,
         },
         { status: 409 }
       );

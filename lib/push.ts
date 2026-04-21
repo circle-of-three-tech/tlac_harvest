@@ -124,14 +124,20 @@ export async function sendPushToUser(
 }
 
 /**
- * Send to all subscriptions belonging to users with a specific role.
+ * Send to all subscriptions belonging to users with ANY of the given role(s).
+ *
+ * Accepts a single role or an array. When multiple roles are passed, Prisma's
+ * `hasSome` naturally deduplicates users who belong to more than one of them,
+ * so a user with roles=['EVANGELIST','FOLLOWUP'] receives exactly one push
+ * for a broadcast targeting both.
  */
 export async function sendPushToRole(
-  role: 'EVANGELIST' | 'FOLLOWUP' | 'ADMIN',
+  role: 'EVANGELIST' | 'FOLLOWUP' | 'ADMIN' | Array<'EVANGELIST' | 'FOLLOWUP' | 'ADMIN'>,
   payload: PushPayload
 ): Promise<SendResult> {
+  const roles = Array.isArray(role) ? role : [role];
   const subscriptions = await prisma.pushSubscription.findMany({
-    where: { user: { roles: { has: role } } },
+    where: { user: { roles: { hasSome: roles } } },
     select: { id: true, endpoint: true, auth: true, p256dh: true, userId: true },
   });
 
