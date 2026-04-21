@@ -82,18 +82,23 @@ export async function GET(req: NextRequest) {
     const [leads, total] = await Promise.all([
       prisma.lead.findMany({
         where,
-        include: {
-          addedBy: { select: { id: true, name: true, email: true } },
-          assignedTo: { select: { id: true, name: true, email: true } },
-          notes: {
-            include: { user: { select: { id: true, name: true } } },
-            orderBy: { createdAt: 'desc' },
-            // Cap notes per lead to prevent a single chatty lead from
-            // ballooning the list response. The detail page fetches the
-            // full note history.
-            take: 5,
-          },
-        },
+         select: {
+      id: true,  
+      fullName: true,
+      phone: true,
+      location: true,
+      ageRange: true,
+      status: true,
+      soulState: true,
+      createdAt: true,
+      addedBy: { select: { id: true, name: true, email: true } },
+      assignedTo: { select: { id: true, name: true, email: true } },
+      notes: {
+        include: { user: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      },
+    },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,

@@ -164,7 +164,7 @@ function useOfflineData<T>(
  */
 export function useLeadsData() {
   const fetchFn = useCallback(async () => {
-    const res = await fetch('/api/leads?limit=1000', { cache: 'no-store' });
+    const res = await fetch('/api/leads?limit=100', { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch leads (${res.status})`);
     const json = await res.json();
     return json.leads ?? [];

@@ -1,7 +1,7 @@
 // app/dashboard/evangelist/leads/page.tsx
 "use client";
 import { useState, useMemo } from "react";
-import { UserRoundPlus, Search, AlertCircle } from "lucide-react";
+import { UserRoundPlus, AlertCircle } from "lucide-react";
 import LeadTable from "@/components/leads/LeadTable";
 import AddLeadModal from "@/components/leads/AddLeadModal";
 import { useLeadsData, usePaginatedOfflineData } from "@/hooks/useOfflineData";
