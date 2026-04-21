@@ -54,6 +54,7 @@ export default function LeadDetailModal({
 
   // Ensure phone numbers are loaded for addedBy and assignedTo
   useEffect(() => {
+    console.log("Checking if we need to fetch lead details for phone numbers", { lead });
     if (lead && (!lead.addedBy?.phone || !lead.assignedTo?.phone)) {
       fetch(`/api/leads/${lead.id}`)
         .then(r => r.json())
