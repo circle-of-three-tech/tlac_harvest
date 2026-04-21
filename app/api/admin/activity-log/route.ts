@@ -62,38 +62,37 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const [auditLogs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        include: {
-          lead: {
-            select: {
-              id: true,
-              fullName: true,
-              phone: true,
-              location: true,
-              status: true,
-              soulState: true,
-              churchMembership: true,
-              churchName: true,
-              monthsConsistent: true,
-              ageRange: true,
-              address: true,
-              gender: true,
-              addedById: true,
-              addedBy: { select: { id: true, name: true, email: true } },
-              assignedToId: true,
-              assignedTo: { select: { id: true, name: true, email: true, phone: true } },
-            },
+    const auditLogs = await prisma.auditLog.findMany({
+      where,
+      include: {
+        lead: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            location: true,
+            status: true,
+            soulState: true,
+            churchMembership: true,
+            churchName: true,
+            monthsConsistent: true,
+            ageRange: true,
+            address: true,
+            gender: true,
+            addedById: true,
+            addedBy: { select: { id: true, name: true, email: true } },
+            assignedToId: true,
+            assignedTo: { select: { id: true, name: true, email: true, phone: true } },
           },
-          user: { select: { id: true, name: true, email: true, role: true } },
         },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.auditLog.count({ where }),
-    ]);
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    });
+
+    const total = await prisma.auditLog.count({ where });
 
     return NextResponse.json({
       auditLogs,
