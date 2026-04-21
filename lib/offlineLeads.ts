@@ -505,7 +505,7 @@ export interface TransformedLead {
 
 export function transformCachedLeadToLead(cachedLead: CachedLead): TransformedLead {
   return {
-    id: cachedLead._id,
+    id: cachedLead.id || cachedLead._id,  // Use id if available, fallback to _id
     fullName: cachedLead.fullName,
     location: cachedLead.location,
     soulState: cachedLead.soulState ?? 'UNBELIEVER',
