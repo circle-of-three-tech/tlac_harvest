@@ -325,15 +325,12 @@ function resolveId(record: Record<string, unknown>, fallbackPrefix: string): str
 export async function cacheLeads(leads: Omit<CachedLead, 'cachedAt'>[]): Promise<void> {
   const database = await getIndexedDB();
   const now = Date.now();
-  const records: CachedLead[] = leads.map((lead) => {
-    const _id = resolveId(lead as unknown as Record<string, unknown>, 'lead');
-    return {
-      ...lead,
-      id: _id, // Mirror _id for component compatibility
-      _id,
-      cachedAt: now,
-    };
-  });
+  const records: CachedLead[] = leads.map((lead) => ({
+    ...lead,
+    // Ensure id is always present (fallback to _id if not)
+    id: lead.id || lead._id,
+    cachedAt: now,
+  }));
   return idbReplaceAll(database, STORE.CACHED_LEADS, records);
 }
 

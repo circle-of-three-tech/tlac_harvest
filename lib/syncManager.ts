@@ -671,7 +671,8 @@ export async function loadCachedLeads(): Promise<void> {
 
     const data = await response.json();
     const leads: Omit<CachedLead, 'cachedAt'>[] = (data.leads || []).map((lead: any) => ({
-      _id: lead?.id ?? lead?._id,
+      id: lead?.id ?? lead?._id,      // Preserve id from API
+      _id: lead?.id ?? lead?._id,     // Also set _id for indexeddb
       fullName: lead.fullName,
       ageRange: lead.ageRange,
       phone: lead.phone,
