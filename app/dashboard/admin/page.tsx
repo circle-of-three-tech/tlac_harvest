@@ -49,11 +49,11 @@ export default function AdminDashboardPage() {
   const [currentSoulsTarget, setCurrentSoulsTarget] = useState(0);
   const [totalSoulsTarget, setTotalSoulsTarget] = useState(0);
 
-  const fetchStats = async () => {
+  const fetchStats = async (from = dateFrom, to = dateTo) => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
+    if (from) params.set("dateFrom", from);
+    if (to) params.set("dateTo", to);
     const res = await fetch(`/api/admin/stats?${params}`);
     const data = await res.json();
     setStats(data);
@@ -68,13 +68,13 @@ export default function AdminDashboardPage() {
 
   const handleFilter = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchStats();
+    fetchStats(dateFrom, dateTo);
   };
 
   const handleClear = () => {
     setDateFrom("");
     setDateTo("");
-    setTimeout(fetchStats, 50);
+    fetchStats("", ""); // pass cleared values directly — no setTimeout needed
   };
 
   const statusData =

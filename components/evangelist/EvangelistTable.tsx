@@ -74,7 +74,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-harvest-100 flex items-center justify-center text-harvest-700 font-bold text-sm">
-                  {user.name[0]}
+                  {user.name?.[0] ?? "?"}
                 </div>
                 <span className="font-medium text-earth-900"> {user.gender === "MALE"? "Bro" : "Sis"}{" "}{user.name}</span>
               </div>
@@ -87,7 +87,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
               </span>
             </td>
             <td onClick={() => openLeadsModal(user)} className="text-earth-400 text-sm cursor-pointer">
-              {format(new Date(user.createdAt), "MMM d, yyyy")}
+              {user.createdAt && !isNaN(new Date(user.createdAt).getTime()) ? format(new Date(user.createdAt), "MMM d, yyyy") : "—"}
             </td>
             <td>
               <button
@@ -117,7 +117,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
                 className="flex items-center gap-3 flex-1 cursor-pointer"
               >
                 <div className="w-10 h-10 rounded-full bg-harvest-100 flex items-center justify-center text-harvest-700 font-bold text-sm flex-shrink-0">
-                  {user.name[0]}
+                  {user.name?.[0] ?? "?"}
                 </div>
                 <div className="min-w-0">
                   <div className="font-semibold text-earth-900 truncate">{user.gender === "MALE"? "Bro" : "Sis"}{" "}{truncate(user.name, 10)}</div>
@@ -141,7 +141,7 @@ const EvangelistTable = ({ evangelists: initialEvangelists }: { evangelists: any
               </div>
               <div className="flex justify-between pt-2 border-t border-harvest-100 cursor-pointer" onClick={() => openLeadsModal(user)}>
                 <span className="text-slate-500">Joined</span>
-                <span className="text-slate-400 text-xs">{format(new Date(user.createdAt), "MMM d, yyyy")}</span>
+                <span className="text-slate-400 text-xs">{user.createdAt && !isNaN(new Date(user.createdAt).getTime()) ? format(new Date(user.createdAt), "MMM d, yyyy") : "—"}</span>
               </div>
             </div>
           </div>

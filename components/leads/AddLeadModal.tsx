@@ -56,7 +56,7 @@ export default function AddLeadModal({
 
     try {
       await createLead(form);
-      onSuccess({ ...form, id: `temp_${Date.now()}` });
+      onSuccess({ ...form, id: crypto.randomUUID() });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to add lead";
       setError(message);

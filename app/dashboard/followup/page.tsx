@@ -15,9 +15,9 @@ export default function FollowupDashboardPage() {
   const { data: session } = useSession();
   const limit = 15;
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (pageNum: number) => {
     setLoading(true);
-    const res = await fetch(`/api/leads?page=${page}&limit=${limit}`);
+    const res = await fetch(`/api/leads?page=${pageNum}&limit=${limit}`);
     const data = await res.json();
     setLeads(data.leads ?? []);
     setTotal(data.total ?? 0);
@@ -27,12 +27,15 @@ export default function FollowupDashboardPage() {
   const fetchUser = async () => {
     const res = await fetch("/api/users/profile");
     const data = await res.json();
-    setUser(data.user)
-  }
+    setUser(data.user);
+  };
 
   useEffect(() => {
-    fetchUser()
-    fetchLeads();
+    fetchUser(); // only needs to run once
+  }, []);
+
+  useEffect(() => {
+    fetchLeads(page); // always uses the current page value, no stale closure
   }, [page]);
 
   const stats = {
