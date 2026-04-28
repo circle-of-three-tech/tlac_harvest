@@ -28,6 +28,8 @@ model User {
   notes             Note[]
   pushSubscriptions PushSubscription[]
   smsTemplates      SMSTemplate[]
+  authoredLeadComments  LeadComment[] @relation("LeadCommentAuthor")
+  receivedLeadComments  LeadComment[] @relation("LeadCommentCounterpart")
 }
 
 model Lead {
@@ -53,6 +55,7 @@ model Lead {
   assignedTo       User?             @relation("AssignedTo", fields: [assignedToId], references: [id])
   notes            Note[]
   smsLogs          SMSLog[]
+  comments         LeadComment[]
 }
 
 model Note {
@@ -135,6 +138,22 @@ model AuditLog {
   createdAt   DateTime     @default(now())
   lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
   user        User         @relation(fields: [userId], references: [id])
+}
+
+model LeadComment {
+  id               String   @id @default(cuid())
+  leadId           String
+  counterpartId    String   // The non-admin participant in the thread (FOLLOWUP or EVANGELIST)
+  authorId         String   // Whoever posted this message
+  authorRole       Role
+  content          String
+  readByRecipientAt DateTime?
+  createdAt        DateTime @default(now())
+  lead             Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  counterpart      User     @relation("LeadCommentCounterpart", fields: [counterpartId], references: [id], onDelete: Cascade)
+  author           User     @relation("LeadCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([leadId, counterpartId, createdAt])
 }
 
 model PushSubscription {

@@ -20,6 +20,7 @@ import {
   MessageSquare,
   ActivitySquare,
   Wheat,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -76,6 +77,11 @@ const adminNav: NavItem[] = [
     href: "/dashboard/admin/sms-logs",
     label: "SMS Logs",
     icon: MessageSquare,
+  },
+  {
+    href: "/dashboard/admin/reports",
+    label: "Monthly Reports",
+    icon: BarChart3,
   },
 ];
 

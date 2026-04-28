@@ -206,7 +206,7 @@ const SMSSettingsPage = () => {
 
     try {
       const res = await fetch(
-        `/api/admin/users/${adminId}/phones?phoneId=${phoneId}`,
+        `/api/admin/users/${adminId}?phoneId=${phoneId}`,
         { method: "DELETE" }
       );
 

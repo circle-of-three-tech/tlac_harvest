@@ -15,7 +15,12 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   clientsClaim: true,
-  disable: process.env.NODE_ENV === 'development',
+  // PWA is disabled in dev by default because the service worker conflicts
+  // with Next.js HMR (you'd need to hard-refresh after every code change).
+  // Set ENABLE_PWA_DEV=true to opt-in when you specifically need to test
+  // PWA behaviour (install prompt, offline, push) against `next dev`.
+  disable:
+    process.env.NODE_ENV === 'development' && process.env.ENABLE_PWA_DEV !== 'true',
 
   runtimeCaching: [
     // ── API — GET only, NetworkFirst ──────────────────────────────────────────

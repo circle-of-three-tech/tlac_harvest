@@ -8,6 +8,7 @@ import {
   CHURCH_LABELS, getAttendanceStatus, cn
 } from "@/lib/utils";
 import { format } from "date-fns";
+import LeadCommentsPanel from "./LeadCommentsPanel";
 
 const AGE_RANGES = ["UNDER_18","AGE_18_25","AGE_26_35","AGE_36_45","AGE_46_60","ABOVE_60"];
 const SOUL_STATES = ["UNBELIEVER","NEW_CONVERT","UNCHURCHED_BELIEVER","HUNGRY_BELIEVER"];
@@ -414,6 +415,13 @@ export default function LeadDetailModal({
                 <span className="sm:hidden">{postingNote ? "..." : "Post"}</span>
               </button>
             </div>)}
+
+            {/* Two-way conversation thread (admin ↔ followup/evangelist) */}
+            {lead?.id && (role === "ADMIN" || role === "FOLLOWUP" || role === "EVANGELIST") && (
+              <div className="pt-3 border-t border-harvest-100">
+                <LeadCommentsPanel leadId={lead.id} />
+              </div>
+            )}
           </div>
         </div>
       </div>
