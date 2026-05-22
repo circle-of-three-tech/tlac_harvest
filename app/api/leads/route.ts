@@ -114,25 +114,28 @@ export async function GET(req: NextRequest) {
       prisma.lead.count({ where }),
     ]);
 
-    // Attach unread-comment counts so the lead list can show a badge without
-    // each row needing its own API call. Admins see unread messages authored
-    // by non-admins across all participants; non-admins see admin messages
-    // addressed to them on this lead.
+    // Attach unread-comment counts. This is best-effort: if the LeadComment
+    // query fails (missing table, enum mismatch, slow query, etc.) we must
+    // still return the leads — the badge is a nice-to-have, not the contract.
     const leadIds = leads.map((l) => l.id);
     const unreadByLead: Record<string, number> = {};
     if (leadIds.length > 0) {
-      const groups = await prisma.leadComment.groupBy({
-        by: ['leadId'],
-        where: {
-          leadId: { in: leadIds },
-          readByRecipientAt: null,
-          ...(isAdmin
-            ? { authorRole: { not: 'ADMIN' } }
-            : { counterpartId: userId, authorRole: 'ADMIN' }),
-        },
-        _count: { _all: true },
-      });
-      for (const g of groups) unreadByLead[g.leadId] = g._count._all;
+      try {
+        const groups = await prisma.leadComment.groupBy({
+          by: ['leadId'],
+          where: {
+            leadId: { in: leadIds },
+            readByRecipientAt: null,
+            ...(isAdmin
+              ? { authorRole: { not: 'ADMIN' } }
+              : { counterpartId: userId, authorRole: 'ADMIN' }),
+          },
+          _count: true,
+        });
+        for (const g of groups) unreadByLead[g.leadId] = g._count;
+      } catch (err) {
+        console.error('GET /api/leads unread-count groupBy failed:', err);
+      }
     }
     const leadsWithUnread = leads.map((l) => ({
       ...l,
