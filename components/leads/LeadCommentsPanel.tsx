@@ -38,8 +38,8 @@ const RELATION_LABEL: Record<Participant["relation"], string> = {
 
 export default function LeadCommentsPanel({ leadId }: { leadId: string }) {
   const { data: session } = useSession();
-  const role = (session?.user as any)?.role as ThreadState["viewer"]["role"] | undefined;
-  const isAdmin = role === "ADMIN";
+  const sessionRole = (session?.user as any)?.role as ThreadState["viewer"]["role"] | undefined;
+  const sessionRoles = ((session?.user as any)?.roles ?? []) as string[];
 
   const [activeCounterpart, setActiveCounterpart] = useState<string | null>(null);
   const [thread, setThread] = useState<ThreadState | null>(null);
@@ -48,9 +48,15 @@ export default function LeadCommentsPanel({ leadId }: { leadId: string }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const postingRef = useRef(false);
 
-  const load = async (counterpartId?: string | null) => {
-    setLoading(true);
+  // Prefer server-confirmed viewer role; fall back to session (single- or multi-role).
+  const isAdmin =
+    thread?.viewer.role === "ADMIN" ||
+    (!thread && (sessionRole === "ADMIN" || sessionRoles.includes("ADMIN")));
+
+  const load = async (counterpartId?: string | null, opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const url = `/api/leads/${leadId}/comments${
@@ -62,21 +68,45 @@ export default function LeadCommentsPanel({ leadId }: { leadId: string }) {
         throw new Error(err?.error || "Failed to load comments");
       }
       const data: ThreadState = await res.json();
-      setThread(data);
+      setThread((prev) => {
+        // Merge comments by id so an optimistically-rendered POST result
+        // isn't duplicated when polling brings it back.
+        if (!prev || prev.counterpartId !== data.counterpartId) return data;
+        const byId = new Map<string, Comment>();
+        for (const c of prev.comments) byId.set(c.id, c);
+        for (const c of data.comments) byId.set(c.id, c);
+        const merged = Array.from(byId.values()).sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        );
+        return { ...data, comments: merged };
+      });
       setActiveCounterpart(data.counterpartId);
 
-      // Mark thread as read for the current viewer.
+      // Mark thread as read for the current viewer; clear local badge on success.
       if (data.counterpartId) {
+        const cpId = data.counterpartId;
         void fetch(`/api/leads/${leadId}/comments`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ counterpartId: data.counterpartId }),
-        });
+          body: JSON.stringify({ counterpartId: cpId }),
+        })
+          .then((r) => {
+            if (!r.ok) return;
+            setThread((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    unreadByCounterpart: { ...prev.unreadByCounterpart, [cpId]: 0 },
+                  }
+                : prev,
+            );
+          })
+          .catch(() => {});
       }
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load comments");
+      if (!opts?.silent) setError(e?.message ?? "Failed to load comments");
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
 
@@ -84,6 +114,25 @@ export default function LeadCommentsPanel({ leadId }: { leadId: string }) {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId]);
+
+  // Lightweight polling + window-focus refresh for "feels live" behavior.
+  useEffect(() => {
+    const tick = () => {
+      if (postingRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void load(activeCounterpart ?? undefined, { silent: true });
+    };
+    const interval = window.setInterval(tick, 15000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadId, activeCounterpart]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -99,6 +148,7 @@ export default function LeadCommentsPanel({ leadId }: { leadId: string }) {
       return;
     }
     setPosting(true);
+    postingRef.current = true;
     setError(null);
     try {
       const res = await fetch(`/api/leads/${leadId}/comments`, {
@@ -114,14 +164,17 @@ export default function LeadCommentsPanel({ leadId }: { leadId: string }) {
         throw new Error(err?.error || "Failed to post comment");
       }
       const created: Comment = await res.json();
-      setThread((prev) =>
-        prev ? { ...prev, comments: [...prev.comments, created] } : prev,
-      );
+      setThread((prev) => {
+        if (!prev) return prev;
+        if (prev.comments.some((c) => c.id === created.id)) return prev;
+        return { ...prev, comments: [...prev.comments, created] };
+      });
       setDraft("");
     } catch (e: any) {
       setError(e?.message ?? "Failed to post comment");
     } finally {
       setPosting(false);
+      postingRef.current = false;
     }
   };
 

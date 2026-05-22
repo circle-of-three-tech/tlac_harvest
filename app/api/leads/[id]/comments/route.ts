@@ -30,18 +30,23 @@ function getViewerRoles(session: { user: { role?: string; roles?: string[] } }):
   return { isAdmin, primaryRole };
 }
 
+function userIsAdmin(u: { role: Role; roles: string[] } | null | undefined): boolean {
+  if (!u) return false;
+  return u.role === Role.ADMIN || (Array.isArray(u.roles) && u.roles.includes('ADMIN'));
+}
+
 async function loadLeadAndParticipants(leadId: string) {
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
     include: {
-      addedBy: { select: { id: true, name: true, role: true } },
-      assignedTo: { select: { id: true, name: true, role: true } },
+      addedBy: { select: { id: true, name: true, role: true, roles: true } },
+      assignedTo: { select: { id: true, name: true, role: true, roles: true } },
     },
   });
   if (!lead) return null;
 
   const participants: Counterpart[] = [];
-  if (lead.addedBy && lead.addedBy.role !== Role.ADMIN) {
+  if (lead.addedBy && !userIsAdmin(lead.addedBy)) {
     participants.push({
       id: lead.addedBy.id,
       name: lead.addedBy.name,
@@ -51,7 +56,7 @@ async function loadLeadAndParticipants(leadId: string) {
   }
   if (
     lead.assignedTo &&
-    lead.assignedTo.role !== Role.ADMIN &&
+    !userIsAdmin(lead.assignedTo) &&
     lead.assignedTo.id !== lead.addedBy?.id
   ) {
     participants.push({
@@ -254,12 +259,12 @@ async function notifyRecipient(args: {
       // Counterpart receives the notification.
       const counterpart = await prisma.user.findUnique({
         where: { id: args.counterpartId },
-        select: { role: true },
+        select: { role: true, roles: true },
       });
-      const url =
-        counterpart?.role === Role.FOLLOWUP
-          ? `/dashboard/followup/leads`
-          : `/dashboard/evangelist/leads`;
+      const isFollowup =
+        counterpart?.role === Role.FOLLOWUP ||
+        (Array.isArray(counterpart?.roles) && counterpart!.roles.includes('FOLLOWUP'));
+      const url = isFollowup ? `/dashboard/followup/leads` : `/dashboard/evangelist/leads`;
       await sendPushToUser(args.counterpartId, {
         title: `Admin comment on ${args.leadName}`,
         body: preview,
@@ -267,14 +272,15 @@ async function notifyRecipient(args: {
         data: { url, leadId: args.leadId },
       });
     } else {
-      // Author is a counterpart → notify all admins.
+      // Author is a counterpart → notify all admins (single- or multi-role).
       const admins = await prisma.user.findMany({
-        where: { role: Role.ADMIN },
+        where: { OR: [{ role: Role.ADMIN }, { roles: { has: 'ADMIN' } }] },
         select: { id: true },
       });
-      await Promise.all(
-        admins.map((a) =>
-          sendPushToUser(a.id, {
+      const uniqueAdminIds = Array.from(new Set(admins.map((a) => a.id)));
+      await Promise.allSettled(
+        uniqueAdminIds.map((id) =>
+          sendPushToUser(id, {
             title: `${args.authorName} on ${args.leadName}`,
             body: preview,
             tag: `lead-comment-${args.leadId}-${args.counterpartId}`,

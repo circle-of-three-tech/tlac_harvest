@@ -33,8 +33,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     },
   });
 
-  // Log note creation as audit event
-  await logNoteCreated(params.id, user.id, content);
+  // Log note creation as audit event (fire-and-forget)
+  void logNoteCreated(params.id, user.id, content);
 
   return NextResponse.json(note, { status: 201 });
 }

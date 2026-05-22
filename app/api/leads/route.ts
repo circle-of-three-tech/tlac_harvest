@@ -114,7 +114,32 @@ export async function GET(req: NextRequest) {
       prisma.lead.count({ where }),
     ]);
 
-    return NextResponse.json({ leads, total, page, limit });
+    // Attach unread-comment counts so the lead list can show a badge without
+    // each row needing its own API call. Admins see unread messages authored
+    // by non-admins across all participants; non-admins see admin messages
+    // addressed to them on this lead.
+    const leadIds = leads.map((l) => l.id);
+    const unreadByLead: Record<string, number> = {};
+    if (leadIds.length > 0) {
+      const groups = await prisma.leadComment.groupBy({
+        by: ['leadId'],
+        where: {
+          leadId: { in: leadIds },
+          readByRecipientAt: null,
+          ...(isAdmin
+            ? { authorRole: { not: 'ADMIN' } }
+            : { counterpartId: userId, authorRole: 'ADMIN' }),
+        },
+        _count: { _all: true },
+      });
+      for (const g of groups) unreadByLead[g.leadId] = g._count._all;
+    }
+    const leadsWithUnread = leads.map((l) => ({
+      ...l,
+      unreadCommentCount: unreadByLead[l.id] ?? 0,
+    }));
+
+    return NextResponse.json({ leads: leadsWithUnread, total, page, limit });
   } catch (error) {
     console.error('GET /api/leads error:', error);
     return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
@@ -193,7 +218,10 @@ async function sendAdminAlerts(lead: {
   try {
     const admins = await prisma.user.findMany({
       where: { role: 'ADMIN' },
-      include: { adminPhones: { select: { phone: true } } },
+      select: {
+        id: true,
+        adminPhones: { select: { phone: true } },
+      },
     });
 
     const template = await getSMSTemplate(SMSType.ADMIN_ALERT);

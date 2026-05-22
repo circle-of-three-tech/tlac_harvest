@@ -17,6 +17,7 @@ export interface Lead {
   assignedTo?: { id: string; name: string } | null;
   addedBy?: { id: string; name: string } | null;
   createdAt: string;
+  unreadCommentCount?: number;
 }
 
 interface Props {
@@ -103,7 +104,17 @@ export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = 
               return (
                 <tr key={lead.id ?? index} className={`hover:bg-slate-100 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`} onClick={() => setSelectedLead(lead)}>
                   <td>
-                    <div className="font-medium text-slate-900">{lead.fullName}</div>
+                    <div className="font-medium text-slate-900 flex items-center gap-1.5">
+                      <span>{lead.fullName}</span>
+                      {(lead.unreadCommentCount ?? 0) > 0 && (
+                        <span
+                          title={`${lead.unreadCommentCount} unread message${lead.unreadCommentCount === 1 ? "" : "s"}`}
+                          className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-orange-600 text-white text-[10px] font-bold"
+                        >
+                          {lead.unreadCommentCount}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-400">{AGE_RANGE_LABELS[lead.ageRange as keyof typeof AGE_RANGE_LABELS]}</div>
                   </td>
                   <td className="text-slate-600">{lead.location}</td>
@@ -160,7 +171,17 @@ export default function LeadTable({ leads, showAssignedTo = true, showAddedBy = 
             >
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1">
-                  <div className="font-semibold text-slate-900">{lead.fullName}</div>
+                  <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                    <span>{lead.fullName}</span>
+                    {(lead.unreadCommentCount ?? 0) > 0 && (
+                      <span
+                        title={`${lead.unreadCommentCount} unread message${lead.unreadCommentCount === 1 ? "" : "s"}`}
+                        className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-orange-600 text-white text-[10px] font-bold"
+                      >
+                        {lead.unreadCommentCount}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-400">{AGE_RANGE_LABELS[lead.ageRange as keyof typeof AGE_RANGE_LABELS]}</div>
                 </div>
                 <Eye className="w-5 h-5 text-slate-400" />
